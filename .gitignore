@@ -1,2 +1,13 @@
+# Java/Scala
 *.class
 *.log
+
+# sbt
+target/
+
+# IntelliJ
+.idea/
+*.iml
+
+# macOS files
+.DS_Store
