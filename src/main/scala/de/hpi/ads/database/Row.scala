@@ -21,6 +21,20 @@ class Row(schema: Schema) {
     def key: Any = data(schema.keyIndex)
 
     /**
+      * Sets a value by its index.
+      * @param index index of the value
+      * @param value value that is written
+      */
+    def put(index: Int, value: String): Unit = data(index) = value
+
+    /**
+      * Sets a value by its index.
+      * @param attribute name of the attribute
+      * @param value value that is written
+      */
+    def putByName(attribute: String, value: String): Unit = put(nameToIndex(attribute), value)
+
+    /**
       * Retrieves a value by its index.
       * @param index index of the value
       * @return the value stored at the index
@@ -88,9 +102,21 @@ object Row {
       */
     def fromMap(data: Map[String, String], schema: Schema): Row = {
         val row = new Row(schema)
-        data.foreach { case (attribute, value) =>
-            row.data(row.nameToIndex(attribute)) = value
-        }
+        data.foreach((row.putByName _).tupled)
+        row
+    }
+
+    /**
+      * Parses a list of attributes values into a row.
+      * @param data list containing the attribute values
+      * @param schema schema of the table that owns the row
+      * @return the created row object
+      */
+    def fromList(data: List[String], schema: Schema): Row = {
+        val row = new Row(schema)
+        data
+            .zipWithIndex
+            .foreach { case (value, index) => row.put(index, value) }
         row
     }
 }
