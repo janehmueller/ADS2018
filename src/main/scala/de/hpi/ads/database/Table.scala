@@ -2,7 +2,7 @@ package de.hpi.ads.database
 
 import java.io.RandomAccessFile
 
-import de.hpi.ads.database.types.Schema
+import de.hpi.ads.database.types.TableSchema
 
 import scala.collection.immutable.NumericRange
 import scala.collection.mutable.{Map => MMap, Set => MSet}
@@ -13,32 +13,30 @@ class Table(fileName: String, schemaString: String) {
       */
     var tableFile: RandomAccessFile = new RandomAccessFile(fileName, "rw")
 
-    /**
-      * The table schema.
-      */
-    val schema = new Schema(schemaString)
+    val schema = new TableSchema(schemaString)
 
     /**
       * Stores offset and length for row keys.
-      * TODO: serialize index
+      * TODO: serialize
       */
-    val keyIndex: MMap[Any, (Long, Int)] = MMap.empty
+    val keyPositions: MMap[Any, (Long, Int)] = MMap.empty
 
     // TODO: more data types than string
 
     /**
       * Contains ranges of unused memory in the table file.
+      * F: I don't think we ever want this.
       */
     var freeMemory: MSet[NumericRange[Long]] = MSet.empty
 
     /**
       * Reads the row for a given key from the table file.
       * @param key the key of the row
-      * @return the row if its found or None if the row key is not in the index
+      * @return the row if its found or None if the row key is not present
       */
     def read(key: Any): Option[Row] = {
         // if the key is not in the index it does not exist
-        keyIndex
+        keyPositions
             .get(key)
             .map { case (offset, length) =>
                 val rowData = readRow(offset, length)
@@ -74,11 +72,11 @@ class Table(fileName: String, schemaString: String) {
       * @param row row object of the inserted data
       */
     def insertRow(row: Row): Unit = {
-        assert(!keyIndex.contains(row.key), "A new entry must contain primary key that does not already exist.")
+        assert(!keyPositions.contains(row.key), "A new entry must contain primary key that does not already exist.")
         val byteData = row.toBytes
         val length = byteData.length
         val offset = appendRow(byteData)
-        keyIndex(row.key) = (offset, length)
+        keyPositions(row.key) = (offset, length)
     }
 
     /**
@@ -98,6 +96,7 @@ class Table(fileName: String, schemaString: String) {
       * @param row new row that overwrites an already existing row
       */
     def update(row: Row): Unit = {
+        //TODO this is not the expected behavior of an "update"
         delete(row.key)
         insertRow(row)
     }
@@ -108,7 +107,7 @@ class Table(fileName: String, schemaString: String) {
       */
     def delete(key: Any): Unit = {
         // TODO: handle free memory in file
-        keyIndex
+        keyPositions
             .remove(key)
             .map { case (offset, length) =>
                 freeMemory += NumericRange(offset, offset + length, 1L)

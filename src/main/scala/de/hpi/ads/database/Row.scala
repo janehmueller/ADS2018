@@ -2,14 +2,14 @@ package de.hpi.ads.database
 
 import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
 
-import de.hpi.ads.database.types.Schema
+import de.hpi.ads.database.types.TableSchema
 
 import scala.collection.mutable.{Map => MMap}
 
-class Row(schema: Schema) {
+class Row(schema: TableSchema) {
 
-    val nameToIndex: Map[String, Int] = schema.attributes
-        .map(attribute => (attribute, schema.indexOfAttribute(attribute)))
+    val nameToIndex: Map[String, Int] = schema.columns
+        .map(attribute => (attribute, schema.columnPosition(attribute)))
         .toMap
 
     var data: MMap[Int, String] = MMap.empty
@@ -18,7 +18,7 @@ class Row(schema: Schema) {
       * Returns the key of the row.
       * @return primary key of the row
       */
-    def key: Any = data(schema.keyIndex)
+    def key: Any = data(schema.primaryKeyPosition)
 
     /**
       * Sets a value by its index.
@@ -28,11 +28,11 @@ class Row(schema: Schema) {
     def put(index: Int, value: String): Unit = data(index) = value
 
     /**
-      * Sets a value by its index.
-      * @param attribute name of the attribute
+      * Sets a value by its column name.
+      * @param column name of the column
       * @param value value that is written
       */
-    def putByName(attribute: String, value: String): Unit = put(nameToIndex(attribute), value)
+    def putByName(column: String, value: String): Unit = put(nameToIndex(column), value)
 
     /**
       * Retrieves a value by its index.
@@ -42,11 +42,11 @@ class Row(schema: Schema) {
     def get(index: Int): String = data(index)
 
     /**
-      * Retrieves a value by the attribute name.
-      * @param attribute name of the attribute
-      * @return value of the attribute
+      * Retrieves a value by the column name.
+      * @param column name of the column
+      * @return value of the column of this row
       */
-    def getByName(attribute: String): String = get(nameToIndex(attribute))
+    def getByName(column: String): String = get(nameToIndex(column))
 
     /**
       * Serializes the row object into a byte array.
@@ -71,7 +71,7 @@ class Row(schema: Schema) {
 object Row {
     val stringEncoding = "UTF-8"
 
-    def apply(schema: Schema): Row = new Row(schema)
+    def apply(schema: TableSchema): Row = new Row(schema)
 
     /**
       * Parses a byte array into a row.
@@ -79,7 +79,8 @@ object Row {
       * @param schema schema of the table that owns the row
       * @return the created row object
       */
-    def fromBinary(data: Array[Byte], schema: Schema): Row = {
+    def fromBinary(data: Array[Byte], schema: TableSchema): Row = {
+        // TODO this seems extremely slow
         val row = new Row(schema)
         val byteStream = new ByteArrayInputStream(data)
         val stream = new ObjectInputStream(byteStream)
@@ -95,24 +96,24 @@ object Row {
     }
 
     /**
-      * Parses a map of attributes and their values into a row.
-      * @param data map containing the attributes and their values
+      * Parses a map of column names and their values into a row.
+      * @param data map containing the column names and their values
       * @param schema schema of the table that owns the row
       * @return the created row object
       */
-    def fromMap(data: Map[String, String], schema: Schema): Row = {
+    def fromMap(data: Map[String, String], schema: TableSchema): Row = {
         val row = new Row(schema)
         data.foreach((row.putByName _).tupled)
         row
     }
 
     /**
-      * Parses a list of attributes values into a row.
-      * @param data list containing the attribute values
+      * Parses a list of values into a row.
+      * @param data list containing the values
       * @param schema schema of the table that owns the row
       * @return the created row object
       */
-    def fromList(data: List[String], schema: Schema): Row = {
+    def fromList(data: List[String], schema: TableSchema): Row = {
         val row = new Row(schema)
         data
             .zipWithIndex
