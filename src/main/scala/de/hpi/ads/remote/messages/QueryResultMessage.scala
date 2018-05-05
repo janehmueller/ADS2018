@@ -1,5 +1,5 @@
 package de.hpi.ads.remote.messages
 
-class QueryResultMessage {
+import de.hpi.ads.database.Row
 
-}
+case class QueryResultMessage(result: List[Row])
