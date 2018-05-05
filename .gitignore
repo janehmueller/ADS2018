@@ -11,3 +11,6 @@ target/
 
 # macOS files
 .DS_Store
+
+# table files
+*.ads
