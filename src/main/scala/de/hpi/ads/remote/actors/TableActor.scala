@@ -1,31 +1,41 @@
-package de.hpi.ads.actors
+package de.hpi.ads.remote.actors
 
-import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import de.hpi.ads.database.Table
+import akka.actor.{ActorRef, Props}
+import de.hpi.ads.database.{Row, Table}
+import de.hpi.ads.remote.actors.UserActor.RowInsertSuccessMessage
+import de.hpi.ads.remote.messages.QueryResultMessage
 
 object TableActor {
-    def props(fileName: String, schemaString: String): Props = Props(new TableActor(fileName, schemaString))
+    def props(table: String, fileName: String, schemaString: String): Props = {
+        Props(new TableActor(table, fileName, schemaString))
+    }
 
-    case class SelectWhereMessage(
-        selectedColumns: List[String],
-        conditions: List[(String, Any)],
+    case class TableSelectByKeyMessage(key: String, queryReceiver: ActorRef)
+
+    case class TableSelectWhereMessage(
+        projection: List[String],
+        conditions: Row => Boolean,
         queryReceiver: ActorRef
     )
 
-    case class InsertRowMessage(data: List[String], queryReceiver: ActorRef)
+    case class TableInsertRowMessage(data: List[String], queryReceiver: ActorRef)
 }
 
-class TableActor(fileName: String, schemaString: String)
-    extends Table(fileName, schemaString) with Actor with ActorLogging
+class TableActor(table: String, fileName: String, schemaString: String)
+    extends Table(fileName, schemaString) with ADSActor
 {
     import TableActor._
 
     def receive: Receive = {
-        case SelectWhereMessage => log.info("received select where")
-        case InsertRowMessage(data, queryReceiver) =>
-            queryReceiver.tell("hello world", this.self)
-            log.info("received insert row")
-        case _ => log.info("received unknown message")
+        case TableSelectByKeyMessage(key, queryReceiver) =>
+            val row = this.select(key)
+            queryReceiver ! QueryResultMessage(row.toList)
+        case msg: TableSelectWhereMessage => log.info("received select where")
+        case TableInsertRowMessage(data, queryReceiver) =>
+            this.insertList(data)
+            log.debug(s"Inserted row: ${data.mkString("; ")}")
+            queryReceiver ! RowInsertSuccessMessage
+        case default => log.error(s"Received unknown message: $default")
     }
 }
 
