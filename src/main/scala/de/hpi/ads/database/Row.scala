@@ -66,6 +66,16 @@ class Row(schema: TableSchema) {
         byteStream.close()
         byteData
     }
+
+    /**
+      * Returns this row as a list.
+      */
+    def toList: List[Any] = {
+        data
+            .toList
+            .sortBy { case (index, value) => index }
+            .map { case (index, value) => value }
+    }
 }
 
 object Row {

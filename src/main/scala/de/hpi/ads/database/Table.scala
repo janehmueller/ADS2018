@@ -34,7 +34,7 @@ class Table(fileName: String, schemaString: String) {
       * @param key the key of the row
       * @return the row if its found or None if the row key is not present
       */
-    def read(key: Any): Option[Row] = {
+    def select(key: Any): Option[Row] = {
         // if the key is not in the index it does not exist
         keyPositions
             .get(key)
@@ -65,6 +65,16 @@ class Table(fileName: String, schemaString: String) {
         assert(data.contains(schema.key), "A new entry must contain at least the primary key.")
         val row = Row.fromMap(data, schema)
         insertRow(row)
+    }
+
+    /**
+      * Inserts a new entry into the table. Assumes the passed data is in order of the attributes. Can miss trailing
+      * columns.
+      * @param data list of column values of the new entry
+      */
+    def insertList(data: List[String]): Unit = {
+        val dataWithColumns = schema.columns.zip(data).toMap
+        insert(dataWithColumns)
     }
 
     /**

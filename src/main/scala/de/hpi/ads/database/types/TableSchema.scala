@@ -5,7 +5,9 @@ class TableSchema(schemaString: String) {
 
     val numValues: Int = columns.length
 
-    // position of primary key
+    /**
+      * Position of primary key.
+      */
     val primaryKeyPosition = 0
 
     val key: String = columns(primaryKeyPosition)
