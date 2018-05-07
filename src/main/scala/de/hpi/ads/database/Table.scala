@@ -5,7 +5,7 @@ import java.io.RandomAccessFile
 import de.hpi.ads.database.types.TableSchema
 
 import scala.collection.immutable.NumericRange
-import scala.collection.mutable.{Map => MMap, Set => MSet}
+import scala.collection.mutable.{ListBuffer, Map => MMap, Set => MSet}
 
 class Table(fileName: String, schemaString: String) {
     /**
@@ -35,12 +35,11 @@ class Table(fileName: String, schemaString: String) {
       * @return the row if its found or None if the row key is not present
       */
     def select(key: Any): Option[Row] = {
-        // if the key is not in the index it does not exist
+        // if the key is not in keyPositions it does not exist
         keyPositions
             .get(key)
             .map { case (offset, length) =>
-                val rowData = readRow(offset, length)
-                Row.fromBinary(rowData, schema)
+                readRow(offset, length)
             }
     }
 
@@ -50,11 +49,21 @@ class Table(fileName: String, schemaString: String) {
       * @param length number of bytes to read
       * @return the read byte array representing the row
       */
-    def readRow(offset: Long, length: Int): Array[Byte] = {
+    def readRowBinary(offset: Long, length: Int): Array[Byte] = {
         val byteBuffer = new Array[Byte](length)
         tableFile.seek(offset)
         tableFile.readFully(byteBuffer)
         byteBuffer
+    }
+
+    /**
+      * Reads a row as a byte array from the table file.
+      * @param offset byte offset in the file
+      * @param length number of bytes to read
+      * @return the read row
+      */
+    def readRow(offset: Long, length: Int): Row = {
+        Row.fromBinary(readRowBinary(offset, length), schema)
     }
 
     /**
@@ -109,6 +118,25 @@ class Table(fileName: String, schemaString: String) {
         //TODO this is not the expected behavior of an "update"
         delete(row.key)
         insertRow(row)
+    }
+
+    def testConditions(row: Row, projection: List[String], conditions: Row => Boolean) : Boolean = {
+        val checks = true
+        projection.foreach { colName =>
+            //TODO
+        }
+        checks
+    }
+
+    def selectWhere(projection: List[String], conditions: Row => Boolean): List[Row] = {
+        val result = ListBuffer[Row]()
+        keyPositions.foreach { x =>
+            val row = readRow(x._2._1, x._2._2)
+            if (testConditions(row, projection, conditions)) {
+                result += row
+            }
+        }
+        result.toList
     }
 
     /**
