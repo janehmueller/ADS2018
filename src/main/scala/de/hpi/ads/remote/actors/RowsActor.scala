@@ -23,14 +23,13 @@ object RowsActor {
 
     case class SelectWhereMessage(queryID: Int, projection: List[String], conditions: Row => Boolean, receiver: ActorRef)
 
-    case class ExpectResultsMessage(queryID: Int, additionalResults: Int)
-
 }
 
 class RowsActor(fileName: String, schemaString: String)
     extends Table(fileName, schemaString) with ADSActor {
 
     import RowsActor._
+    import ResultCollectorActor.ExpectResultsMessage
 
     val children : List[ActorRef] = List()
     val RNG = new Random()
