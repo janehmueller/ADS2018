@@ -3,21 +3,14 @@ package de.hpi.ads.remote.actors
 import akka.actor.{ActorRef, Props}
 import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.TableSchema
+import de.hpi.ads.remote.actors.ResultCollectorActor.ExpectResultsMessage
 import de.hpi.ads.remote.actors.UserActor.RowInsertSuccessMessage
 import de.hpi.ads.remote.messages.QueryResultMessage
 
 import scala.util.Random
 
 object RowsActor {
-    val defaultName = "INTERFACE"
-
-    /**
-      * Create Props for an actor of this type.
-      *
-      * @return a Props for creating this actor, which can then be further configured
-      *         (e.g. calling `.withDispatcher()` on it)
-      */
-    def props(): Props = Props(new InterfaceActor)
+    def props(fileName: String, schemaString: String): Props = Props(new RowsActor(fileName, schemaString))
 
     case class InsertRowMessage(data: List[String], receiver: ActorRef)
 
@@ -25,11 +18,8 @@ object RowsActor {
 
 }
 
-class RowsActor(fileName: String, schemaString: String)
-    extends Table(fileName, schemaString) with ADSActor {
-
+class RowsActor(fileName: String, schemaString: String) extends Table(fileName, schemaString) with ADSActor {
     import RowsActor._
-    import ResultCollectorActor.ExpectResultsMessage
 
     val children : List[ActorRef] = List()
     val RNG = new Random()
@@ -45,6 +35,7 @@ class RowsActor(fileName: String, schemaString: String)
         if (children.nonEmpty) {
             //figure out which child should receive the row according to splitting
             //for now: give it to random child
+            //TODO hashing
             children(RNG.nextInt(children.size)) ! InsertRowMessage(data, receiver)
         } else {
             //insert row to self

@@ -1,5 +1,3 @@
 package de.hpi.ads.remote.messages
 
-class QueryFailedMessage {
-
-}
+case class QueryFailedMessage(queryID: Int, message: String)

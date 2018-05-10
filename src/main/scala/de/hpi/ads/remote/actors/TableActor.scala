@@ -10,9 +10,10 @@ object TableActor {
         Props(new TableActor(table, fileName, schemaString))
     }
 
-    case class TableSelectByKeyMessage(key: String, queryReceiver: ActorRef)
+    case class TableSelectByKeyMessage(queryID: Int, key: String, queryReceiver: ActorRef)
 
     case class TableSelectWhereMessage(
+        queryID: Int,
         projection: List[String],
         conditions: Row => Boolean,
         queryReceiver: ActorRef
@@ -27,9 +28,9 @@ class TableActor(table: String, fileName: String, schemaString: String)
     import TableActor._
 
     def receive: Receive = {
-        case TableSelectByKeyMessage(key, queryReceiver) =>
+        case TableSelectByKeyMessage(queryID, key, queryReceiver) =>
             val row = this.select(key)
-            queryReceiver ! QueryResultMessage(row.toList)
+            queryReceiver ! QueryResultMessage(queryID, row.toList)
         case msg: TableSelectWhereMessage => log.info("received select where")
         case TableInsertRowMessage(data, queryReceiver) =>
             this.insertList(data)

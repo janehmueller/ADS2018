@@ -1,9 +1,11 @@
 package de.hpi.ads.remote.actors
 
+import java.util.UUID
+
 import akka.actor.{ActorRef, Props}
 import de.hpi.ads.database.Row
 import de.hpi.ads.remote.actors.InterfaceActor.{CreateTableMessage, InsertRowMessage, SelectWhereMessage}
-import de.hpi.ads.remote.messages.QueryResultMessage
+import de.hpi.ads.remote.messages.{QueryFailedMessage, QueryResultMessage}
 
 object UserActor {
     val defaultName = "USER"
@@ -18,7 +20,6 @@ object UserActor {
     // system interaction
     case class TableCreationSuccessMessage(table: String)
     case object RowInsertSuccessMessage
-
 }
 
 class UserActor(interfaceActor: ActorRef) extends ADSActor {
@@ -31,9 +32,11 @@ class UserActor(interfaceActor: ActorRef) extends ADSActor {
         case UserSelectValuesMessage(table, projection, conditions) => selectValues(table, projection, conditions)
 
         // system messages
-        case QueryResultMessage(result) => result.foreach { resultRow => println(resultRow.toList)}
+        case QueryResultMessage(queryId, result) =>
+            println(s"Results for query $queryId: ${result.map(_.toList).mkString("\n")}")
         case TableCreationSuccessMessage(table) => log.info(s"Successfully created table $table")
         case RowInsertSuccessMessage => log.info("Successfully inserted row.")
+        case QueryFailedMessage(queryID, message) => log.error(s"Query $queryID failed: $message")
         case default => log.error(s"Received unknown message: $default")
     }
 

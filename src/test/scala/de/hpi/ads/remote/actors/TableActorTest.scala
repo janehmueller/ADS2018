@@ -30,8 +30,9 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         val tableActor = system.actorOf(TableActor.props("test", tableFileFullPath, schema))
         tableActor ! TableActor.TableInsertRowMessage(row, testActor)
         expectMsg(RowInsertSuccessMessage)
-        tableActor ! TableActor.TableSelectByKeyMessage("1", testActor)
+        tableActor ! TableActor.TableSelectByKeyMessage(1, "1", testActor)
         val response = expectMsgType[QueryResultMessage]
+        response.queryID shouldBe 1
         response.result should have length 1
         response.result.head.toList shouldEqual row
     }

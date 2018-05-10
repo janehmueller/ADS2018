@@ -4,18 +4,20 @@ import akka.actor.{ActorRef, Props}
 import de.hpi.ads.database.Row
 import de.hpi.ads.remote.actors.TableActor.{TableInsertRowMessage, TableSelectWhereMessage}
 import de.hpi.ads.remote.actors.UserActor.TableCreationSuccessMessage
+import de.hpi.ads.remote.messages.QueryFailedMessage
 
 import scala.collection.mutable.{Map => MMap}
 
 object InterfaceActor {
     val defaultName = "INTERFACE"
 
-    /**
-      * Create Props for an actor of this type.
-      *
-      * @return a Props for creating this actor, which can then be further configured
-      *         (e.g. calling `.withDispatcher()` on it)
-      */
+    var queryCounter: Int = 0
+
+    def nextQueryId: Int = {
+        queryCounter += 1
+        queryCounter - 1
+    }
+
     def props(): Props = Props(new InterfaceActor)
 
     case class CreateTableMessage(table: String, schema: String)
@@ -59,17 +61,15 @@ class InterfaceActor extends ADSActor {
             return
         }
         val tableActor = tables(table)
-        tableActor ! TableSelectWhereMessage(projection, conditions, this.sender())
+        tableActor ! TableSelectWhereMessage(nextQueryId, projection, conditions, this.sender())
     }
 
     def assertTableExistance(table: String, negateCheck: Boolean = false): Boolean = {
         val exists = tables.contains(table)
         if (!exists && !negateCheck) {
-            log.error(s"Table $table does not exist!")
-            // TODO: throw/send error
+            this.sender() ! QueryFailedMessage(-1, s"Table $table does not exist!")
         } else if (exists && negateCheck) {
-            log.error(s"Table $table already exists!")
-            // TODO: throw/send error
+            this.sender() ! QueryFailedMessage(-1, s"Table $table already exists!")
         }
         !(exists ^ negateCheck)
     }

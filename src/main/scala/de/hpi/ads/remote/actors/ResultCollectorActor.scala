@@ -1,39 +1,23 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.{Row, Table}
-import de.hpi.ads.database.types.TableSchema
-import de.hpi.ads.remote.actors.UserActor.RowInsertSuccessMessage
-import de.hpi.ads.remote.messages.QueryResultMessage
+import de.hpi.ads.database.Row
 
-import scala.collection.mutable.ListBuffer
-import scala.util.Random
+import scala.collection.mutable.{Map => MMap}
+import de.hpi.ads.remote.messages.QueryResultMessage
+import de.hpi.ads.remote.models.Query
 
 object ResultCollectorActor {
-    val defaultName = "INTERFACE"
-
-    /**
-      * Create Props for an actor of this type.
-      *
-      * @return a Props for creating this actor, which can then be further configured
-      *         (e.g. calling `.withDispatcher()` on it)
-      */
-    def props(): Props = Props(new InterfaceActor)
+    def props(): Props = Props(new ResultCollectorActor)
 
     case class ExpectResultsMessage(queryID: Int, additionalResults: Int)
     case class PrepareNewQueryResultsMessage(queryID: Int, receiver: ActorRef)
-
-    case class Query(queryID: Int, partialResult: ListBuffer[Row], remainingResults: Int, receiver: ActorRef)
 }
 
-
-
-class ResultCollectorActor()
-    extends ADSActor {
-
+class ResultCollectorActor extends ADSActor {
     import ResultCollectorActor._
 
-    var queries : Map[Int, Query] = Map()
+    val queries: MMap[Int, Query] = MMap.empty
 
     def receive: Receive = {
         case ExpectResultsMessage(queryID, additionalResults) => expectResults(queryID, additionalResults)
@@ -42,19 +26,20 @@ class ResultCollectorActor()
         case default => log.error(s"Received unknown message: $default")
     }
 
-    def expectResults(queryID: Int, additionalResults: Int) =  {
+    def expectResults(queryID: Int, additionalResults: Int): Unit =  {
         queries(queryID).remainingResults += additionalResults
     }
 
-    def prepareNewQueryResults(queryID: Int, receiver: ActorRef) = {
-        queries += (queryID -> Query(queryID, ListBuffer(), 1, receiver))
+    def prepareNewQueryResults(queryID: Int, receiver: ActorRef): Unit = {
+        queries(queryID) = Query(queryID, receiver)
     }
 
     def queryResult(queryID: Int, rows: List[Row]): Unit = {
-        queries(queryID).partialResult ++= rows
-        queries(queryID).remainingResults -= 1
-        if (queries(queryID).remainingResults == 0) {
-            queries(queryID).receiver ! QueryResultMessage(queryID, queries(queryID).partialResult.toList)
+        val query = queries(queryID)
+        query.addPartialResult(rows)
+        if (query.isFinished) {
+            query.receiver ! QueryResultMessage(queryID, query.partialResult)
+            queries.remove(queryID)
         }
     }
 
