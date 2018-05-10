@@ -7,7 +7,7 @@ import de.hpi.ads.database.types.TableSchema
 import scala.collection.mutable.{Map => MMap}
 
 class Row(schema: TableSchema) {
-
+    // TODO serialization that enables deserialization without knowledge of index
     val nameToIndex: Map[String, Int] = schema.columns
         .map(attribute => (attribute, schema.columnPosition(attribute)))
         .toMap

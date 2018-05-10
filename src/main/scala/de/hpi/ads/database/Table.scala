@@ -26,6 +26,7 @@ class Table(fileName: String, schemaString: String) {
     /**
       * Contains ranges of unused memory in the table file.
       * F: I don't think we ever want this.
+      * TODO: compaction
       */
     var freeMemory: MSet[NumericRange[Long]] = MSet.empty
 
@@ -120,23 +121,12 @@ class Table(fileName: String, schemaString: String) {
         insertRow(row)
     }
 
-    def testConditions(row: Row, projection: List[String], conditions: Row => Boolean) : Boolean = {
-        val checks = true
-        projection.foreach { colName =>
-            //TODO
-        }
-        checks
-    }
-
     def selectWhere(projection: List[String], conditions: Row => Boolean): List[Row] = {
-        val result = ListBuffer[Row]()
-        keyPositions.foreach { x =>
-            val row = readRow(x._2._1, x._2._2)
-            if (testConditions(row, projection, conditions)) {
-                result += row
-            }
-        }
-        result.toList
+        // TODO: projection
+        keyPositions
+            .map { case (key, (offset, length)) => readRow(offset, length) }
+            .filter(conditions)
+            .toList
     }
 
     /**
