@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
     "org.scalactic" %% "scalactic" % "3.0.5",
-    "org.scalatest" %% "scalatest" % "3.0.5" % Test
+    "org.scalatest" %% "scalatest" % "3.0.5" % Test,
+    "io.suzaku" %% "boopickle" % "1.3.0"
 )
 
 // testing settings
