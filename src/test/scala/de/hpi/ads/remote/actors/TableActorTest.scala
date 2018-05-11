@@ -36,4 +36,25 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         response.result should have length 1
         response.result.head.toList shouldEqual row
     }
+
+    it should "select correct values with condition" in {
+        val schema = "id;title;year"
+        val row1 = List("1", "Movie1", "2000")
+        val row2 = List("2", "Movie2", "2001")
+        val row3 = List("3", "Movie3", "2001")
+        val row4 = List("4", "Movie4", "2000")
+        val tableActor = system.actorOf(TableActor.props("test", tableFileFullPath, schema))
+        tableActor ! TableActor.TableInsertRowMessage(row1, testActor)
+        expectMsg(RowInsertSuccessMessage)
+        tableActor ! TableActor.TableInsertRowMessage(row2, testActor)
+        expectMsg(RowInsertSuccessMessage)
+        tableActor ! TableActor.TableInsertRowMessage(row3, testActor)
+        expectMsg(RowInsertSuccessMessage)
+        tableActor ! TableActor.TableInsertRowMessage(row4, testActor)
+        expectMsg(RowInsertSuccessMessage)
+        tableActor ! TableActor.TableSelectWhereMessage(List("year"), _.key == "2001", testActor)
+        val response = expectMsgType[QueryResultMessage]
+        response.result should have length 2
+        response.result.head.toList shouldEqual List(row2, row3)
+    }
 }
