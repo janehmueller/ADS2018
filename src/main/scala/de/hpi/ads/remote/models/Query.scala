@@ -1,11 +1,12 @@
 package de.hpi.ads.remote.models
 
 import akka.actor.ActorRef
-import de.hpi.ads.database.Row
 
-case class Query(queryID: Int, receiver: ActorRef, var remainingResults: Int, var partialResult: List[Row] = Nil) {
+import scala.collection.mutable.ListBuffer
 
-    def addPartialResult(resultRows: List[Row]): Unit = {
+case class Query(queryID: Int, receiver: ActorRef, var remainingResults: Int, var partialResult: ListBuffer[List[Any]] = new ListBuffer[List[Any]]) {
+
+    def addPartialResult(resultRows: List[List[Any]]): Unit = {
         partialResult ++= resultRows
         remainingResults -= 1
     }

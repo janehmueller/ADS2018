@@ -1,7 +1,6 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.Row
 
 import scala.collection.mutable.{Map => MMap}
 import de.hpi.ads.remote.messages.QueryResultMessage
@@ -16,7 +15,6 @@ object ResultCollectorActor {
 
 class ResultCollectorActor extends ADSActor {
     import ResultCollectorActor._
-
     val queries: MMap[Int, Query] = MMap.empty
 
     def receive: Receive = {
@@ -34,11 +32,11 @@ class ResultCollectorActor extends ADSActor {
         queries(queryID) = Query(queryID, receiver)
     }
 
-    def queryResult(queryID: Int, rows: List[Row]): Unit = {
+    def queryResult(queryID: Int, rows: List[List[Any]]): Unit = {
         val query = queries(queryID)
         query.addPartialResult(rows)
         if (query.isFinished) {
-            query.receiver ! QueryResultMessage(queryID, query.partialResult)
+            query.receiver ! QueryResultMessage(queryID, query.partialResult.toList)
             queries.remove(queryID)
         }
     }

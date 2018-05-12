@@ -1,7 +1,8 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.Row
+
+import de.hpi.ads.database.types.TableSchema
 import de.hpi.ads.remote.actors.TableActor.{TableInsertRowMessage, TableSelectWhereMessage}
 import de.hpi.ads.remote.actors.UserActor.TableCreationSuccessMessage
 import de.hpi.ads.remote.messages.QueryFailedMessage
@@ -20,11 +21,15 @@ object InterfaceActor {
 
     def props(): Props = Props(new InterfaceActor)
 
-    case class CreateTableMessage(table: String, schema: String)
+    case class CreateTableMessage(tableName: String, columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int])
 
-    case class InsertRowMessage(table: String, data: List[Any])
+    case class InsertRowMessage(tableName: String, data: List[Any])
 
-    case class SelectWhereMessage(table: String, projection: List[String], conditions: Row => Boolean)
+    case class SelectWhereMessage(tableName: String,
+                                  projection: List[String],
+                                  conditionColumnNames: List[String],
+                                  conditionOperators: List[String],
+                                  conditionValues: List[Any])
 }
 
 class InterfaceActor extends ADSActor {
@@ -33,48 +38,52 @@ class InterfaceActor extends ADSActor {
     val tables: MMap[String, ActorRef] = MMap.empty
 
     def receive: Receive = {
-        case CreateTableMessage(table, schema) => createTable(table, schema)
+        case CreateTableMessage(tableName, columnNames, columnDataTypes, columnSizes) => createTable(tableName, columnNames, columnDataTypes, columnSizes)
         case InsertRowMessage(table, data) => insertRow(table, data)
-        case SelectWhereMessage(table, projection, conditions) => selectWhere(table, projection, conditions)
+        case SelectWhereMessage(table, projection, conditionColNames, conditionOps, conditionVals) => selectWhere(table, projection, conditionColNames, conditionOps, conditionVals)
         case default => log.error(s"Received unknown message: $default")
     }
 
-    def createTable(table: String, schema: String): Unit = {
-        if (assertTableExistance(table, negateCheck = true)) {
+    def createTable(tableName: String, columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int]): Unit = {
+        if (assertTableExistance(tableName, negateCheck = true)) {
             return
         }
-        val tableActor = this.context.actorOf(TableActor.props(table, fileName(table), schema), actorName(table))
-        tables(table) = tableActor
-        this.sender() ! TableCreationSuccessMessage(table)
+        val tableActor = this.context.actorOf(TableActor.props(tableName, fileName(tableName), new TableSchema(columnNames, columnDataTypes, columnSizes)), actorName(tableName))
+        tables(tableName) = tableActor
+        this.sender() ! TableCreationSuccessMessage(tableName)
     }
 
-    def insertRow(table: String, data: List[Any]): Unit = {
-        if (assertTableExistance(table)) {
+    def insertRow(tableName: String, data: List[Any]): Unit = {
+        if (assertTableExistance(tableName)) {
             return
         }
-        val tableActor = tables(table)
+        val tableActor = tables(tableName)
         tableActor ! TableInsertRowMessage(data.map(_.toString), this.sender())
     }
 
-    def selectWhere(table: String, projection: List[String], conditions: Row => Boolean): Unit = {
-        if (assertTableExistance(table)) {
+    def selectWhere(tableName: String,
+                    projection: List[String],
+                    conditionColumnNames: List[String],
+                    conditionOperators: List[String],
+                    conditionValues: List[Any]): Unit = {
+        if (assertTableExistance(tableName)) {
             return
         }
-        val tableActor = tables(table)
-        tableActor ! TableSelectWhereMessage(nextQueryId, projection, conditions, this.sender())
+        val tableActor = tables(tableName)
+        tableActor ! TableSelectWhereMessage(nextQueryId, projection, conditionColumnNames, conditionOperators, conditionValues, this.sender())
     }
 
-    def assertTableExistance(table: String, negateCheck: Boolean = false): Boolean = {
-        val exists = tables.contains(table)
+    def assertTableExistance(tableName: String, negateCheck: Boolean = false): Boolean = {
+        val exists = tables.contains(tableName)
         if (!exists && !negateCheck) {
-            this.sender() ! QueryFailedMessage(-1, s"Table $table does not exist!")
+            this.sender() ! QueryFailedMessage(-1, s"Table $tableName does not exist!")
         } else if (exists && negateCheck) {
-            this.sender() ! QueryFailedMessage(-1, s"Table $table already exists!")
+            this.sender() ! QueryFailedMessage(-1, s"Table $tableName already exists!")
         }
         !(exists ^ negateCheck)
     }
 
-    def actorName(table: String): String = s"TABLE_${table.toUpperCase}"
+    def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
 
-    def fileName(table: String): String = s"table.$table.ads"
+    def fileName(tableName: String): String = s"table.$tableName.ads"
 }

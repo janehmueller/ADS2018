@@ -1,16 +1,33 @@
 package de.hpi.ads.database.types
 
-class TableSchema(schemaString: String) {
-    val columns: List[String] = schemaString.split(";").toList
+import scala.collection.mutable.ListBuffer
 
-    val numValues: Int = columns.length
+case class TableSchema(columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int]) {
 
-    /**
-      * Position of primary key.
-      */
+    val numberOfColumns: Int = columnDataTypes.length
+
     val primaryKeyPosition = 0
 
-    val key: String = columns(primaryKeyPosition)
+    val keyColumnName: String = columnNames(primaryKeyPosition)
 
-    def columnPosition(columnName: String): Int = columns.indexOf(columnName)
+    val entrySize = columnSizes.foldLeft(0)(_ + _)
+
+    def columnPosition(columnName: String): Int = columnNames.indexOf(columnName)
+
+    def columnPositions(relevantColumnNames: List[String]) : List[Int] = {
+        val result: ListBuffer[Int] = ListBuffer()
+        val it1 = relevantColumnNames.iterator
+        val it2 = columnNames.iterator
+        var j = 0
+        var colName: String = it1.next()
+        while (it2.hasNext) {
+            if (colName == it2.next()) {
+                result += j
+                j += 1
+                colName = it1.next()
+            }
+            it2.next()
+        }
+        result.toList
+    }
 }

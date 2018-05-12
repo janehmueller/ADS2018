@@ -3,7 +3,6 @@ package de.hpi.ads.remote.actors
 import java.util.UUID
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.Row
 import de.hpi.ads.remote.actors.InterfaceActor.{CreateTableMessage, InsertRowMessage, SelectWhereMessage}
 import de.hpi.ads.remote.messages.{QueryFailedMessage, QueryResultMessage}
 
@@ -13,9 +12,13 @@ object UserActor {
     def props(interfaceActor: ActorRef): Props = Props(new UserActor(interfaceActor))
 
     // user interaction
-    case class UserCreateTableMessage(table: String, schema: String)
+    case class UserCreateTableMessage(table: String, columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int])
     case class UserInsertValuesMessage(table: String, values: List[Any])
-    case class UserSelectValuesMessage(table: String, projection: List[String], conditions: Row => Boolean)
+    case class UserSelectValuesMessage(table: String,
+                                       projection: List[String],
+                                       conditionColumnNames: List[String],
+                                       conditionOperators: List[String],
+                                       conditionValues: List[Any])
 
     // system interaction
     case class TableCreationSuccessMessage(table: String)
@@ -27,9 +30,9 @@ class UserActor(interfaceActor: ActorRef) extends ADSActor {
 
     def receive: Receive = {
         // user messages
-        case UserCreateTableMessage(table, schema) => createTable(table, schema)
+        case UserCreateTableMessage(table, columnNames, columnDataTypes, columnSizes) => createTable(table, columnNames, columnDataTypes, columnSizes)
         case UserInsertValuesMessage(table, values) => insertValues(table, values)
-        case UserSelectValuesMessage(table, projection, conditions) => selectValues(table, projection, conditions)
+        case UserSelectValuesMessage(table, projection, conditionColumnNames, conditionOperators, conditionValues) => selectValues(table, projection, conditionColumnNames, conditionOperators, conditionValues)
 
         // system messages
         case QueryResultMessage(queryId, result) =>
@@ -40,15 +43,19 @@ class UserActor(interfaceActor: ActorRef) extends ADSActor {
         case default => log.error(s"Received unknown message: $default")
     }
 
-    def createTable(table: String, schema: String): Unit = {
-        interfaceActor ! CreateTableMessage(table, schema)
+    def createTable(table: String, columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int]): Unit = {
+        interfaceActor ! CreateTableMessage(table, columnNames, columnDataTypes, columnSizes)
     }
 
     def insertValues(table: String, values: List[Any]): Unit = {
         interfaceActor ! InsertRowMessage(table, values)
     }
 
-    def selectValues(table: String, projection: List[String], conditions: Row => Boolean): Unit = {
-        interfaceActor ! SelectWhereMessage(table, projection, conditions)
+    def selectValues(table: String,
+                     projection: List[String],
+                     conditionColumnNames: List[String],
+                     conditionOperators: List[String],
+                     conditionValues: List[Any]): Unit = {
+        interfaceActor ! SelectWhereMessage(table, projection, conditionColumnNames, conditionOperators, conditionValues)
     }
 }

@@ -9,11 +9,9 @@ object Main {
         val actorSystem = ActorSystem("ActorDatabaseSystem")
         val interfaceActor = actorSystem.actorOf(InterfaceActor.props(), InterfaceActor.defaultName)
         val userActor = actorSystem.actorOf(UserActor.props(interfaceActor), UserActor.defaultName)
-        userActor ! UserCreateTableMessage("movies", "id;title")
+        userActor ! UserCreateTableMessage("movies", List("id", "title"), List(Int, "S"), List(0, 255))
         userActor ! UserInsertValuesMessage("movies", List("1", "movie1"))
         userActor ! UserInsertValuesMessage("movies", List("2", "movie2"))
-        userActor ! UserSelectValuesMessage("movies", List("title"), _.key == "1")
-        while (true) {}
         actorSystem.terminate()
     }
 }
