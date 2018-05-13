@@ -15,7 +15,7 @@ object Main {
         userActor ! ExecuteCommandMessage(CreateTableMessage("actors", "id;name;surname"))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("1", "Max", "Mustermann")))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("2", "Max", "Metermann")))
-        userActor ! ExecuteCommandMessage(SelectWhereMessage("actors", List("id", "name", "surname"), _.getByName("name") == "Max"))
+        userActor ! ExecuteCommandMessage(SelectWhereMessage("actors", List("id", "name", "surname"), _.name == "Max"))
         val movieTypes = List(
             ColumnType("id", IntType),
             ColumnType("name", StringType),
@@ -30,9 +30,9 @@ object Main {
             ("rating", 3.5)
         )
         userActor ! ExecuteCommandMessage(NamedInsertRowMessage("movies", row))
-        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.key == 1))
-        userActor ! ExecuteCommandMessage(UpdateWhereMessage("movies", List(("name", "Ready Player One"), ("rating", 9.5)), _.key == 1))
-        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.key == 1))
+        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.id == 1))
+        userActor ! ExecuteCommandMessage(UpdateWhereMessage("movies", List(("name", "Ready Player One"), ("rating", 9.5)), _.id == 1))
+        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.id == 1))
         while (true) {}
         actorSystem.terminate()
     }

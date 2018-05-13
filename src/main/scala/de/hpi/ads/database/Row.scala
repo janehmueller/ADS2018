@@ -5,14 +5,17 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, 
 import de.hpi.ads.database.types.TableSchema
 
 import scala.collection.mutable.{MutableList => MList}
+import scala.language.dynamics
 
-class Row(schema: TableSchema) {
+class Row(schema: TableSchema) extends Dynamic {
     val nameToIndex: Map[String, Int] = schema
         .columnNames
         .zipWithIndex
         .toMap
 
     val data: MList[Any] = MList.fill(schema.columns.length)(null)
+
+    def selectDynamic(name: String): Any = this.getByName(name)
 
     /**
       * Returns the key of the row.
