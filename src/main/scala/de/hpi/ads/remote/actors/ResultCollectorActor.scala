@@ -7,10 +7,15 @@ import de.hpi.ads.remote.messages.QueryResultMessage
 import de.hpi.ads.remote.models.Query
 
 object ResultCollectorActor {
+    val defaultName = "RESULT_COLLECTOR"
+
     def props(): Props = Props(new ResultCollectorActor)
 
-    case class ExpectResultsMessage(queryID: Int, additionalResults: Int)
+    /** Announces a new query with results and where the final results should be sent. */
     case class PrepareNewQueryResultsMessage(queryID: Int, receiver: ActorRef)
+
+    /** Announces that additional results should be expected for a query. */
+    case class ExpectResultsMessage(queryID: Int, additionalResults: Int)
 }
 
 class ResultCollectorActor extends ADSActor {
@@ -18,9 +23,16 @@ class ResultCollectorActor extends ADSActor {
     val queries: MMap[Int, Query] = MMap.empty
 
     def receive: Receive = {
-        case ExpectResultsMessage(queryID, additionalResults) => expectResults(queryID, additionalResults)
+        /** Create new query object for the query id. */
         case PrepareNewQueryResultsMessage(queryID, receiver) => prepareNewQueryResults(queryID, receiver)
+
+        /** Update the expected number of results for the query. */
+        case ExpectResultsMessage(queryID, additionalResults) => expectResults(queryID, additionalResults)
+
+        /** Add result to currently stored results and deliver them if the query is finished. */
         case QueryResultMessage(queryID, result) => queryResult(queryID, result)
+
+        /** Default case */
         case default => log.error(s"Received unknown message: $default")
     }
 
