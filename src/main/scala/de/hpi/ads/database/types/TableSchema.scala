@@ -1,33 +1,36 @@
 package de.hpi.ads.database.types
 
-import scala.collection.mutable.ListBuffer
-
-case class TableSchema(columnNames: List[String], columnDataTypes: List[Any], columnSizes: List[Int]) {
-
-    val numberOfColumns: Int = columnDataTypes.length
-
+case class TableSchema(columns: List[ColumnType]) {
+    /**
+      * Position of primary key.
+      */
     val primaryKeyPosition = 0
 
-    val keyColumnName: String = columnNames(primaryKeyPosition)
+    def numValues: Int = columns.length
 
-    val entrySize = columnSizes.foldLeft(0)(_ + _)
+    def keyColumn: String = columns(primaryKeyPosition).name
 
-    def columnPosition(columnName: String): Int = columnNames.indexOf(columnName)
+    def columnNames: List[String] = columns.map(_.name)
 
-    def columnPositions(relevantColumnNames: List[String]) : List[Int] = {
-        val result: ListBuffer[Int] = ListBuffer()
-        val it1 = relevantColumnNames.iterator
-        val it2 = columnNames.iterator
-        var j = 0
-        var colName: String = it1.next()
-        while (it2.hasNext) {
-            if (colName == it2.next()) {
-                result += j
-                j += 1
-                colName = it1.next()
-            }
-            it2.next()
-        }
-        result.toList
+    def columnIndex(columnName: String): Int = columnNames.indexOf(columnName)
+
+    def columnIndices(columnNames: List[String]): List[Int] = columnNames.map(columnIndex)
+
+    def columnPosition(columnName: String): Int = columnIndex(columnName)
+
+    def columnPositions(relevantColumnNames: List[String]) : List[Int] = columnIndices(relevantColumnNames)
+
+    def entrySize: Int = 0 // TODO
+}
+
+object TableSchema {
+    def apply(schema: String) = new TableSchema(parseSchema(schema))
+
+    def parseSchema(schema: String): List[ColumnType] = {
+        // TODO parse schema string (column names, data types, column sizes)
+        schema
+            .split(";")
+            .toList
+            .map(name => ColumnType(name, StringType))
     }
 }
