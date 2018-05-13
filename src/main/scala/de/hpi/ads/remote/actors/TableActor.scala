@@ -5,7 +5,7 @@ import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.{ColumnType, TableSchema}
 import de.hpi.ads.remote.actors.ResultCollectorActor.{ExpectResultsMessage, PrepareNewQueryResultsMessage}
 import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
-import de.hpi.ads.remote.messages.{QueryResultMessage, QuerySuccessMessage}
+import de.hpi.ads.remote.messages.{QueryResultMessage, QuerySuccessMessage, ShutdownMessage}
 
 import scala.util.Random
 
@@ -51,7 +51,7 @@ class TableActor(tableName: String, fileName: String, schema: TableSchema, resul
     }
 
     def receive: Receive = {
-        /** Table Create */
+        /** Table Insert */
         case TableInsertRowMessage(queryID, data, receiver) => insertRow(queryID, data, receiver)
         case TableNamedInsertRowMessage(queryID, data, receiver) => insertRowWithNames(queryID, data, receiver)
 
@@ -67,6 +67,11 @@ class TableActor(tableName: String, fileName: String, schema: TableSchema, resul
         /** Table Delete */
         case TableDeleteWhereMessage(queryID, conditions, receiver) =>
             deleteWhere(queryID, conditions, receiver)
+
+        /** Handle dropping the table. */
+        case ShutdownMessage =>
+            // TODO stop children
+            context.stop(this.self)
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")

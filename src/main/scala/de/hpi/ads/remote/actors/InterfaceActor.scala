@@ -111,7 +111,6 @@ class InterfaceActor(resultCollector: ActorRef) extends ADSActor {
             return
         }
         val tableActor = tables.remove(tableName).get
-//        context.stop(tableActor)
         tableActor ! ShutdownMessage
         this.sender ! TableOpSuccessMessage(tableName, "DROP")
     }
