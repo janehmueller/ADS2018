@@ -31,8 +31,7 @@ class Table(fileName: String, schema: TableSchema) {
     this.openTableFile()
 
     def openTableFile(): Unit = {
-        // TODO: Read existing table file and create index.
-        // TODO: serialzie schema and read it again
+        // TODO: maybe serialize schema and read it again
         val fileExists = Files.exists(Paths.get(fileName))
         this.tableFile = new RandomAccessFile(fileName, "rw")
         if (fileExists) {

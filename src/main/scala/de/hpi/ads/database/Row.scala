@@ -110,7 +110,6 @@ object Row {
       * @return the created row object
       */
     def fromBinary(data: Array[Byte], schema: TableSchema): Row = {
-        // TODO this seems extremely slow
         val row = new Row(schema)
         row.readBytes(data)
         row
