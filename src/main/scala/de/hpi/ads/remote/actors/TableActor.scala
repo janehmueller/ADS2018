@@ -46,7 +46,7 @@ class TableActor(tableName: String, fileName: String, schema: TableSchema, resul
 
     override def postStop(): Unit = {
         super.postStop()
-//        this.cleanUp()
+        this.cleanUp()
         // TODO: stop child actors (maybe via Poison Pill)
     }
 

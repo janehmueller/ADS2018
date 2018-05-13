@@ -31,7 +31,7 @@ class UserActor(interfaceActor: ActorRef) extends ADSActor {
         /** Query Results */
         case QueryResultMessage(queryID, result) =>
             println(s"Results for query $queryID:\n${result.map(_.toList).mkString("\n")}")
-        case QuerySuccessMessage(queryID) => log.info(s"Query $queryID suceeded")
+        case QuerySuccessMessage(queryID) => log.info(s"Query $queryID succeeded")
         case QueryFailureMessage(queryID, message) => log.error(s"Query $queryID failed: $message")
 
         /** Default case */
