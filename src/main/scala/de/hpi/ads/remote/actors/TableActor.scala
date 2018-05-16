@@ -167,7 +167,7 @@ class TableActor(tableName: String, fileName: String, schema: TableSchema, resul
 //        } else {
 //            val result: ListBuffer[List[Any]] = ListBuffer()
 //            if (conditionColumnNames.size == 1) {
-//                val conditionColumn: Int = schema.columnPosition(conditionColumnNames(0))
+//                val conditionColumn: Int = schema.columnIndex(conditionColumnNames(0))
 //                if (conditionOperators(0) == "=") {
 //                    result ++= this.selectWhere(_(conditionColumn) == conditionValues(0))
 //                } else if (conditionOperators(0) == "<=" && schema.columnDataTypes(conditionColumn) == Int) {
@@ -178,7 +178,7 @@ class TableActor(tableName: String, fileName: String, schema: TableSchema, resul
 //                    assert(false, "Operation not supported")
 //                }
 //            } else if (conditionColumnNames.size == 2) {
-//                val conditionColumn1: Int = schema.columnPosition(conditionColumnNames(0))
+//                val conditionColumn1: Int = schema.columnIndex(conditionColumnNames(0))
 //                if (conditionColumnNames(0) == conditionColumnNames(1) && conditionOperators(0) == "<=" && conditionOperators(1) == ">=" && schema.columnDataTypes(conditionColumn1) == Int) {
 //                    result ++= this.selectWhere(x => x(conditionColumn1).asInstanceOf[Int] <= conditionValues(0).asInstanceOf[Int] && x(conditionColumn1).asInstanceOf[Int] >= conditionValues(1).asInstanceOf[Int])
 //                } else {

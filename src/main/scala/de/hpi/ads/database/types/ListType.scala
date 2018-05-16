@@ -14,7 +14,7 @@ case class ListType(dataType: DataType) extends DataType {
 
     def readBytes(stream: ObjectInputStream): Any = {
         val numEntries = stream.readInt
-        var readData = ListBuffer[Any]()
+        val readData = ListBuffer[Any]()
         var index = 0
         while(index < numEntries) {
             readData += dataType.readBytes(stream)

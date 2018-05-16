@@ -7,3 +7,7 @@ case class ColumnType(name: String, dataType: DataType) {
 
     def readBytes(stream: ObjectInputStream): Any = dataType.readBytes(stream)
 }
+
+object ColumnType {
+    def apply(name: String, dataType: String): ColumnType = ColumnType(name, DataType.fromString(dataType))
+}

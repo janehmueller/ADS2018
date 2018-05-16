@@ -16,10 +16,6 @@ case class TableSchema(columns: List[ColumnType]) {
 
     def columnIndices(columnNames: List[String]): List[Int] = columnNames.map(columnIndex)
 
-    def columnPosition(columnName: String): Int = columnIndex(columnName)
-
-    def columnPositions(relevantColumnNames: List[String]) : List[Int] = columnIndices(relevantColumnNames)
-
     def entrySize: Int = 0 // TODO
 }
 
@@ -27,10 +23,11 @@ object TableSchema {
     def apply(schema: String) = new TableSchema(parseSchema(schema))
 
     def parseSchema(schema: String): List[ColumnType] = {
-        // TODO parse schema string (column names, data types, column sizes)
         schema
             .split(";")
-            .toList
-            .map(name => ColumnType(name, StringType))
+            .map { field =>
+                val Array(name, dataType) = field.trim.split(":")
+                ColumnType(name.trim, dataType.trim)
+            }.toList
     }
 }
