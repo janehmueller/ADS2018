@@ -19,14 +19,15 @@ package de.hpi.ads.database
 import java.util.Date
 
 package object operators {
-    trait Operator[T] {
+    trait Operator {
         def column: String
-        def value: T
+        def value: Any
 
-        def compare(other: T): Boolean
+        def compare(other: Any): Boolean
 
         def compareAny(other: Any): Boolean = {
-            other.getClass == value.getClass && this.compare(other.asInstanceOf[T])
+            // TODO: support comparisons like < for different data types (e.g., int and long)
+            other.getClass == value.getClass && this.compare(other)
         }
 
         def apply(row: Row): Boolean = this.compareAny(row.getByName(column))
@@ -39,18 +40,18 @@ package object operators {
         }
     }
 
-    case class EqOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other == value
+    case class EqOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other == value
         override def compareAny(other: Any): Boolean = other == value
     }
 
-    case class NeqOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other != value
+    case class NeqOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other != value
         override def compareAny(other: Any): Boolean = other != value
     }
 
-    case class LessThanOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other match {
+    case class LessThanOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other match {
             case x: Boolean => x < value.asInstanceOf[Boolean]
             case x: Date => x.getTime < value.asInstanceOf[Date].getTime
             case x: Double => x < value.asInstanceOf[Double]
@@ -61,8 +62,8 @@ package object operators {
         }
     }
 
-    case class LessThanEqOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other match {
+    case class LessThanEqOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other match {
             case x: Boolean => x <= value.asInstanceOf[Boolean]
             case x: Date => x.getTime <= value.asInstanceOf[Date].getTime
             case x: Double => x <= value.asInstanceOf[Double]
@@ -73,8 +74,8 @@ package object operators {
         }
     }
 
-    case class GreaterThanOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other match {
+    case class GreaterThanOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other match {
             case x: Boolean => x > value.asInstanceOf[Boolean]
             case x: Date => x.getTime > value.asInstanceOf[Date].getTime
             case x: Double => x > value.asInstanceOf[Double]
@@ -85,8 +86,8 @@ package object operators {
         }
     }
 
-    case class GreaterThanEqOperator[T](column: String, value: T) extends Operator[T] {
-        override def compare(other: T): Boolean = other match {
+    case class GreaterThanEqOperator(column: String, value: Any) extends Operator {
+        override def compare(other: Any): Boolean = other match {
             case x: Boolean => x >= value.asInstanceOf[Boolean]
             case x: Date => x.getTime >= value.asInstanceOf[Date].getTime
             case x: Double => x >= value.asInstanceOf[Double]

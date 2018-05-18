@@ -3,6 +3,7 @@ package de.hpi.ads.remote.actors
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.testkit.{ImplicitSender, TestKit}
+import de.hpi.ads.database.operators.EqOperator
 import de.hpi.ads.database.types._
 import de.hpi.ads.remote.actors.ResultCollectorActor.PrepareNewQueryResultsMessage
 import de.hpi.ads.remote.messages._
@@ -35,7 +36,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
         tableActor ! TableInsertRowMessage(1, row, testActor)
         expectMsg(QuerySuccessMessage(1))
-        tableActor ! TableSelectWhereMessage(2, List("id", "title"), _.id == 1, testActor)
+        tableActor ! TableSelectWhereMessage(2, List("id", "title"), EqOperator("id", 1), testActor)
         expectMsgType[PrepareNewQueryResultsMessage]
         val response = expectMsgType[QueryResultMessage]
         response.queryID shouldBe 2
@@ -59,7 +60,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         expectMsg(QuerySuccessMessage(3))
         tableActor ! TableInsertRowMessage(4, row4, testActor)
         expectMsg(QuerySuccessMessage(4))
-        tableActor ! TableSelectWhereMessage(5, List("title"), _.year == 2001, testActor)
+        tableActor ! TableSelectWhereMessage(5, List("title"), EqOperator("year", 2001), testActor)
         expectMsgType[PrepareNewQueryResultsMessage]
         val response = expectMsgType[QueryResultMessage]
         response.result should have length 2

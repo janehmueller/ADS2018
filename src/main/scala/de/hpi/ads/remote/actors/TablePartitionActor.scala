@@ -1,9 +1,10 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.{Row, Table}
-import de.hpi.ads.database.types.{ColumnType, TableSchema}
-import de.hpi.ads.remote.actors.ResultCollectorActor.{ExpectResultsMessage, PrepareNewQueryResultsMessage}
+import de.hpi.ads.database.operators.Operator
+import de.hpi.ads.database.Table
+import de.hpi.ads.database.types.TableSchema
+import de.hpi.ads.remote.actors.ResultCollectorActor.ExpectResultsMessage
 import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
 import de.hpi.ads.remote.messages._
 
@@ -39,16 +40,16 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         case TableNamedInsertRowMessage(queryID, data, receiver) => insertRowWithNames(queryID, data, receiver)
 
         /** Table Read */
-        case TableSelectWhereMessage(queryID, projection, conditions, receiver) =>
-            selectWhere(queryID, projection, conditions, resultCollector)
+        case TableSelectWhereMessage(queryID, projection, operator, receiver) =>
+            selectWhere(queryID, projection, operator, resultCollector)
 
         /** Table Update */
-        case TableUpdateWhereMessage(queryID, data, conditions, receiver) =>
-            updateWhere(queryID, data, conditions, receiver)
+        case TableUpdateWhereMessage(queryID, data, operator, receiver) =>
+            updateWhere(queryID, data, operator, receiver)
 
         /** Table Delete */
-        case TableDeleteWhereMessage(queryID, conditions, receiver) =>
-            deleteWhere(queryID, conditions, receiver)
+        case TableDeleteWhereMessage(queryID, operator, receiver) =>
+            deleteWhere(queryID, operator, receiver)
 
         /** Handle dropping the table. */
         case ShutdownMessage =>
@@ -100,79 +101,41 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         duplicateKeyOption.isEmpty
     }
 
-    def selectWhere(queryID: Int, projection: List[String], conditions: Row => Boolean, receiver: ActorRef): Unit = {
+    def selectWhere(queryID: Int, projection: List[String], operator: Operator, receiver: ActorRef): Unit = {
         // gather answers either from child actors or from associated data
         // TODO check if index exists and use it
         if (children.nonEmpty) {
             receiver ! ExpectResultsMessage(queryID, children.length - 1)
-            children.foreach(_ ! TableSelectWhereMessage(queryID, projection, conditions, receiver))
+            children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
         }
-        val result = this.selectWhere(conditions)
+        val result = this.selectWhere(row => operator(row))
         // TODO projection * (select *) operator
         val projectedResult = result.map(_.project(projection))
         receiver ! QueryResultMessage(queryID, projectedResult)
     }
 
-    def updateWhere(queryID: Int, data: List[(String, Any)], conditions: Row => Boolean, receiver: ActorRef): Unit = {
+    def updateWhere(queryID: Int, data: List[(String, Any)], operator: Operator, receiver: ActorRef): Unit = {
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
             // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableUpdateWhereMessage(queryID, data, conditions, receiver)
+            children(RNG.nextInt(children.size)) ! TableUpdateWhereMessage(queryID, data, operator, receiver)
         } else {
-            this.updateWhere(data, conditions)
+            this.updateWhere(data, row => operator(row))
             receiver ! QuerySuccessMessage(queryID)
         }
     }
 
-    def deleteWhere(queryID: Int, conditions: Row => Boolean, receiver: ActorRef): Unit = {
+    def deleteWhere(queryID: Int, operator: Operator, receiver: ActorRef): Unit = {
         // TODO: figure out how to delete data from file without breaking reading the file
         // TODO: (e.g. write a Boolean in the row "header" that indicates if this row was deleted)
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
             // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableDeleteWhereMessage(queryID, conditions, receiver)
+            children(RNG.nextInt(children.size)) ! TableDeleteWhereMessage(queryID, operator, receiver)
         } else {
-            this.deleteWhere(conditions)
+            this.deleteWhere(row => operator(row))
             receiver ! QuerySuccessMessage(queryID)
         }
     }
 
 }
-
-//    case class SelectWhereMessage(queryID: Int, projection: List[String], conditionColumnNames: List[String], conditionOperators: List[String], conditionValues: List[Any], receiver: ActorRef)
-//    def selectWhere(queryID: Int, projection: List[String], conditionColumnNames: List[String], conditionOperators: List[String], conditionValues: List[Any], receiver: ActorRef): Unit = {
-//        //gather answer either from child actors or from associated data
-//        //TODO check if index exists and use it
-//        if (children.nonEmpty) {
-//            receiver ! ExpectResultsMessage(queryID, children.size - 1)
-//            children.foreach(child => child ! SelectWhereMessage(queryID, projection, conditionColumnNames, conditionOperators, conditionValues, receiver))
-//        } else {
-//            val result: ListBuffer[List[Any]] = ListBuffer()
-//            if (conditionColumnNames.size == 1) {
-//                val conditionColumn: Int = schema.columnIndex(conditionColumnNames(0))
-//                if (conditionOperators(0) == "=") {
-//                    result ++= this.selectWhere(_(conditionColumn) == conditionValues(0))
-//                } else if (conditionOperators(0) == "<=" && schema.columnDataTypes(conditionColumn) == Int) {
-//                    result ++= this.selectWhere(_(conditionColumn).asInstanceOf[Int] <= conditionValues(0).asInstanceOf[Int])
-//                } else if (conditionOperators(0) == ">=" && schema.columnDataTypes(conditionColumn) == Int) {
-//                    result ++= this.selectWhere(_(conditionColumn).asInstanceOf[Int] >= conditionValues(0).asInstanceOf[Int])
-//                } else {
-//                    assert(false, "Operation not supported")
-//                }
-//            } else if (conditionColumnNames.size == 2) {
-//                val conditionColumn1: Int = schema.columnIndex(conditionColumnNames(0))
-//                if (conditionColumnNames(0) == conditionColumnNames(1) && conditionOperators(0) == "<=" && conditionOperators(1) == ">=" && schema.columnDataTypes(conditionColumn1) == Int) {
-//                    result ++= this.selectWhere(x => x(conditionColumn1).asInstanceOf[Int] <= conditionValues(0).asInstanceOf[Int] && x(conditionColumn1).asInstanceOf[Int] >= conditionValues(1).asInstanceOf[Int])
-//                } else {
-//                    assert(false, "Operation not supported")
-//                }
-//            } else {
-//                assert(false, "Operation not supported")
-//            }
-//            if (projection != null) {
-//                receiver ! QueryResultMessage(queryID, this.projectRows(projection, result.toList))
-//            } else {
-//                receiver ! QueryResultMessage(queryID, result.toList)
-//            }
-//        }
-//    }
