@@ -14,7 +14,6 @@ object UserActor {
     /** System responses */
     case class TableOpSuccessMessage(table: String, op: String)
     case class TableOpFailureMessage(table: String, op: String, message: String)
-    case object RowInsertSuccessMessage
 }
 
 class UserActor(interfaceActor: ActorRef) extends ADSActor {

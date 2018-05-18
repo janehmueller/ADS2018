@@ -12,7 +12,7 @@ object Main {
         val resultCollector = actorSystem.actorOf(ResultCollectorActor.props(), ResultCollectorActor.defaultName)
         val interfaceActor = actorSystem.actorOf(InterfaceActor.props(resultCollector), InterfaceActor.defaultName)
         val userActor = actorSystem.actorOf(UserActor.props(interfaceActor), UserActor.defaultName)
-        userActor ! ExecuteCommandMessage(CreateTableMessage("actors", "id;name;surname"))
+        userActor ! ExecuteCommandMessage(CreateTableMessage("actors", "id:string;name:string;surname:string"))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("1", "Max", "Mustermann")))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("2", "Max", "Metermann")))
         userActor ! ExecuteCommandMessage(SelectWhereMessage("actors", List("id", "name", "surname"), _.name == "Max"))

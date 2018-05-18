@@ -40,7 +40,6 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
         /** Table Read */
         case TableSelectWhereMessage(queryID, projection, conditions, receiver) =>
-            resultCollector ! PrepareNewQueryResultsMessage(queryID, receiver)
             selectWhere(queryID, projection, conditions, resultCollector)
 
         /** Table Update */
