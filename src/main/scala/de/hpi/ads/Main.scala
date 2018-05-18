@@ -19,20 +19,18 @@ object Main {
         val movieTypes = List(
             ColumnType("id", IntType),
             ColumnType("name", StringType),
-            ColumnType("actors", ListType(StringType)),
             ColumnType("rating", DoubleType)
         )
         userActor ! ExecuteCommandMessage(CreateTableWithTypesMessage("movies", movieTypes))
         val row = List(
             ("id", 1),
             ("name", "Ready"),
-            ("actors", List("actor 1", "actor 2", "actor 3")),
             ("rating", 3.5)
         )
         userActor ! ExecuteCommandMessage(NamedInsertRowMessage("movies", row))
-        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.id == 1))
+        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "rating"), _.id == 1))
         userActor ! ExecuteCommandMessage(UpdateWhereMessage("movies", List(("name", "Ready Player One"), ("rating", 9.5)), _.id == 1))
-        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "actors", "rating"), _.id == 1))
+        userActor ! ExecuteCommandMessage(SelectWhereMessage("movies", List("id", "name", "rating"), _.id == 1))
         while (true) {}
         actorSystem.terminate()
     }

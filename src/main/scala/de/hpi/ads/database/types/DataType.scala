@@ -20,9 +20,6 @@ object DataType {
             case "int" => IntType
             case "string" => StringType
             case "long" => LongType
-            case r"""list<([a-z]+)${secondType}>""" => ListType(this.fromString(secondType))
-            case r"""map<([a-z]+)${keyType} *, *([a-z<>, ]+)${valueType}>""" =>
-                MapType(this.fromString(keyType), this.fromString(valueType))
             case unknownType => throw new IllegalArgumentException(s"Encountered unknown data type: $unknownType")
         }
     }
