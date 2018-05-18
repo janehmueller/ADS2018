@@ -10,7 +10,7 @@ class TableTest extends FlatSpec with Matchers {
     "Table" should "insert and read correctly" in {
         val schema = TableSchema(List(
             ColumnType("id", IntType),
-            ColumnType("title", StringType),
+            ColumnType("title", StringType()),
             ColumnType("long", LongType),
             ColumnType("double", DoubleType)))
         val row1 = List(1, "abcde", 34927L, 5.8)

@@ -8,6 +8,16 @@ trait DataType {
     def writeBytes(data: Any, stream: ObjectOutputStream): Unit
 
     def readBytes(stream: ObjectInputStream): Any
+
+    /**
+      * Byte conversions from
+      * https://www.daniweb.com/programming/software-development/code/216874/primitive-types-as-byte-arrays
+      */
+    def toBytes(data: Any): Array[Byte]
+
+    def fromBytes(data: Array[Byte]): Any
+
+    def byteSize: Int
 }
 
 object DataType {
@@ -18,7 +28,7 @@ object DataType {
             case "date" => DateType
             case "double" => DoubleType
             case "int" => IntType
-            case "string" => StringType
+            case "string" => StringType()
             case "long" => LongType
             case unknownType => throw new IllegalArgumentException(s"Encountered unknown data type: $unknownType")
         }

@@ -18,7 +18,7 @@ object Main {
         userActor ! ExecuteCommandMessage(SelectWhereMessage("actors", List("id", "name", "surname"), _.name == "Max"))
         val movieTypes = List(
             ColumnType("id", IntType),
-            ColumnType("name", StringType),
+            ColumnType("name", StringType()),
             ColumnType("rating", DoubleType)
         )
         userActor ! ExecuteCommandMessage(CreateTableWithTypesMessage("movies", movieTypes))
