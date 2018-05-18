@@ -4,14 +4,14 @@ import java.io.{ObjectInputStream, ObjectOutputStream}
 import java.util.Date
 
 object DateType extends DataType {
-    def byteSize = 8
+    override def byteSize = 8
 
-    def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
+    override def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
         val internalData = data.asInstanceOf[Date]
         stream.writeLong(internalData.getTime)
     }
 
-    def readBytes(stream: ObjectInputStream): Date = {
+    override def readBytes(stream: ObjectInputStream): Date = {
         new Date(stream.readLong)
     }
 
@@ -20,7 +20,7 @@ object DateType extends DataType {
         LongType.toBytes(longValue)
     }
 
-    def fromBytes(data: Array[Byte]): Date = {
+    override def fromBytes(data: Array[Byte]): Date = {
         new Date(LongType.fromBytes(data))
     }
 }

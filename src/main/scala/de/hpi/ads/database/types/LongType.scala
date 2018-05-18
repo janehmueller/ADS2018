@@ -3,18 +3,18 @@ package de.hpi.ads.database.types
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 object LongType extends DataType {
-    def byteSize = 8
+    override def byteSize = 8
 
-    def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
+    override def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
         val internalData = data.asInstanceOf[Long]
         stream.writeLong(internalData)
     }
 
-    def readBytes(stream: ObjectInputStream): Long = {
+    override def readBytes(stream: ObjectInputStream): Long = {
         stream.readLong
     }
 
-    def toBytes(data: Any): Array[Byte] = {
+    override def toBytes(data: Any): Array[Byte] = {
         val longValue = data.asInstanceOf[Long]
         Array(
             longValue >> 56,
@@ -29,7 +29,7 @@ object LongType extends DataType {
         .map(_.asInstanceOf[Byte])
     }
 
-    def fromBytes(data: Array[Byte]): Long = {
+    override def fromBytes(data: Array[Byte]): Long = {
         val longData = data
             .map(0xff & _)
             .map(_.asInstanceOf[Long])

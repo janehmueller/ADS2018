@@ -33,7 +33,7 @@ package object messages {
     case class TableInsertRowMessage(queryID: Int, data: List[Any], receiver: ActorRef)
     case class TableNamedInsertRowMessage(queryID: Int, data: List[(String, Any)], receiver: ActorRef)
     /** Table Read */
-    // TODO: conditions that an use an index
+    // TODO: conditions that can use an index
     case class TableSelectWhereMessage(queryID: Int, projection: List[String], conditions: Row => Boolean, receiver: ActorRef)
     /** Table Update */
     case class TableUpdateWhereMessage(queryID: Int, data: List[(String, Any)], conditions: Row => Boolean, receiver: ActorRef)
