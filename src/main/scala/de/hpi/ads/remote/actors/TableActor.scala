@@ -1,160 +1,65 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, Props}
-import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.{ColumnType, TableSchema}
-import de.hpi.ads.remote.actors.ResultCollectorActor.{ExpectResultsMessage, PrepareNewQueryResultsMessage}
-import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
-import de.hpi.ads.remote.messages.{QueryResultMessage, QuerySuccessMessage, ShutdownMessage}
+import de.hpi.ads.remote.actors.ResultCollectorActor.PrepareNewQueryResultsMessage
+import de.hpi.ads.remote.messages._
 
-import scala.util.Random
 
 object TableActor {
     def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
 
     def fileName(tableName: String): String = s"table.$tableName.ads"
 
-    def props(table: String, fileName: String, schema: String, resultCollector: ActorRef): Props = {
-        Props(new TableActor(table, fileName, TableSchema(schema), resultCollector))
+    def props(table: String, schema: String, resultCollector: ActorRef): Props = {
+        Props(new TableActor(table, TableSchema(schema), resultCollector))
     }
 
-    def props(table: String, fileName: String, columns: List[ColumnType], resultCollector: ActorRef): Props = {
-        Props(new TableActor(table, fileName, TableSchema(columns), resultCollector))
+    def props(table: String, columns: List[ColumnType], resultCollector: ActorRef): Props = {
+        Props(new TableActor(table, TableSchema(columns), resultCollector))
     }
 
-    /** Table Create */
-    case class TableInsertRowMessage(queryID: Int, data: List[Any], receiver: ActorRef)
-    case class TableNamedInsertRowMessage(queryID: Int, data: List[(String, Any)], receiver: ActorRef)
-
-    /** Table Read */
-    case class TableSelectWhereMessage(queryID: Int, projection: List[String], conditions: Row => Boolean, receiver: ActorRef)
-
-    /** Table Update */
-    case class TableUpdateWhereMessage(queryID: Int, data: List[(String, Any)], conditions: Row => Boolean, receiver: ActorRef)
-
-    /** Table Delete */
-    case class TableDeleteWhereMessage(queryID: Int, conditions: Row => Boolean, receiver: ActorRef)
+    def props(table: String, columns: TableSchema, resultCollector: ActorRef): Props = {
+        Props(new TableActor(table, columns, resultCollector))
+    }
 }
 
-class TableActor(tableName: String, fileName: String, schema: TableSchema, resultCollector: ActorRef)
-    extends Table(fileName, schema) with ADSActor
-{
+class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorRef) extends ADSActor {
     import TableActor._
 
-    val children : List[ActorRef] = List()
-    val RNG = new Random()
+    // TODO: partition file names
+    val tablePartitionActor: ActorRef = context.actorOf(
+        TablePartitionActor.props(tableName, fileName(tableName), schema, resultCollector))
 
     override def postStop(): Unit = {
         super.postStop()
-        this.cleanUp()
         // TODO: stop child actors (maybe via Poison Pill)
     }
 
     def receive: Receive = {
         /** Table Insert */
-        case TableInsertRowMessage(queryID, data, receiver) => insertRow(queryID, data, receiver)
-        case TableNamedInsertRowMessage(queryID, data, receiver) => insertRowWithNames(queryID, data, receiver)
+        case msg: TableInsertRowMessage => tablePartitionActor ! msg
+        case msg: TableNamedInsertRowMessage => tablePartitionActor ! msg
 
         /** Table Read */
-        case TableSelectWhereMessage(queryID, projection, conditions, receiver) =>
-            resultCollector ! PrepareNewQueryResultsMessage(queryID, receiver)
-            selectWhere(queryID, projection, conditions, resultCollector)
+        case msg: TableSelectWhereMessage =>
+            resultCollector ! PrepareNewQueryResultsMessage(msg.queryID, msg.receiver)
+            tablePartitionActor ! msg
 
         /** Table Update */
-        case TableUpdateWhereMessage(queryID, data, conditions, receiver) =>
-            updateWhere(queryID, data, conditions, receiver)
+        case msg: TableUpdateWhereMessage => tablePartitionActor ! msg
 
         /** Table Delete */
-        case TableDeleteWhereMessage(queryID, conditions, receiver) =>
-            deleteWhere(queryID, conditions, receiver)
+        case msg: TableDeleteWhereMessage => tablePartitionActor ! msg
 
         /** Handle dropping the table. */
         case ShutdownMessage =>
-            // TODO stop children
+            tablePartitionActor ! ShutdownMessage
             context.stop(this.self)
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")
     }
-
-    def insertRow(queryID: Int, data: List[Any], receiver: ActorRef): Unit = {
-        if (children.nonEmpty) {
-            // TODO: figure out which child actor should receive the row according to splitting
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableInsertRowMessage(queryID, data, receiver)
-        } else {
-            if (!inputContainsValidKey(schema.columnNames.zip(data))) {
-                receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
-                return
-            }
-            this.insertList(data)
-            receiver ! QuerySuccessMessage(queryID)
-        }
-    }
-
-    def insertRowWithNames(queryID: Int, data: List[(String, Any)], receiver: ActorRef): Unit = {
-        if (children.nonEmpty) {
-            // TODO: figure out which child actor should receive the row according to splitting
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableNamedInsertRowMessage(queryID, data, receiver)
-        } else {
-            if (!inputContainsValidKey(data)) {
-                receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
-                return
-            }
-            this.insert(data)
-            receiver ! QuerySuccessMessage(queryID)
-        }
-    }
-
-    /**
-      * Validates that the input contains a primary key and that this primary key does not already exist.
-      * @param data input data that is validated
-      * @return true if the input data is valid
-      */
-    def inputContainsValidKey(data: List[(String, Any)]): Boolean = {
-        val keyExistsOption = data.find(_._1 == schema.keyColumn)
-        val duplicateKeyOption = keyExistsOption.filter { case (columnName, key) => this.keyPositions.contains(key) }
-        duplicateKeyOption.isEmpty
-    }
-
-    def selectWhere(queryID: Int, projection: List[String], conditions: Row => Boolean, receiver: ActorRef): Unit = {
-        // gather answers either from child actors or from associated data
-        // TODO check if index exists and use it
-        if (children.nonEmpty) {
-            receiver ! ExpectResultsMessage(queryID, children.length - 1)
-            children.foreach(_ ! TableSelectWhereMessage(queryID, projection, conditions, receiver))
-        }
-        val result = this.selectWhere(conditions)
-        // TODO projection * (select *) operator
-        val projectedResult = result.map(_.project(projection))
-        receiver ! QueryResultMessage(queryID, projectedResult)
-    }
-
-    def updateWhere(queryID: Int, data: List[(String, Any)], conditions: Row => Boolean, receiver: ActorRef): Unit = {
-        if (children.nonEmpty) {
-            // TODO: figure out which child actors store the relevant rows
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableUpdateWhereMessage(queryID, data, conditions, receiver)
-        } else {
-            this.updateWhere(data, conditions)
-            receiver ! QuerySuccessMessage(queryID)
-        }
-    }
-
-    def deleteWhere(queryID: Int, conditions: Row => Boolean, receiver: ActorRef): Unit = {
-        // TODO: figure out how to delete data from file without breaking reading the file
-        // TODO: (e.g. write a Boolean in the row "header" that indicates if this row was deleted)
-        if (children.nonEmpty) {
-            // TODO: figure out which child actors store the relevant rows
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableDeleteWhereMessage(queryID, conditions, receiver)
-        } else {
-            this.deleteWhere(conditions)
-            receiver ! QuerySuccessMessage(queryID)
-        }
-    }
-
 }
 
 //    case class SelectWhereMessage(queryID: Int, projection: List[String], conditionColumnNames: List[String], conditionOperators: List[String], conditionValues: List[Any], receiver: ActorRef)

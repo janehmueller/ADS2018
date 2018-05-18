@@ -3,9 +3,8 @@ package de.hpi.ads.remote.actors
 import akka.actor.{ActorRef, Props}
 import de.hpi.ads.database.Row
 import de.hpi.ads.database.types.ColumnType
-import de.hpi.ads.remote.actors.TableActor._
 import de.hpi.ads.remote.actors.UserActor.{TableOpFailureMessage, TableOpSuccessMessage}
-import de.hpi.ads.remote.messages.{QueryFailureMessage, ShutdownMessage}
+import de.hpi.ads.remote.messages._
 
 import scala.collection.mutable.{Map => MMap}
 
@@ -87,7 +86,7 @@ class InterfaceActor(resultCollector: ActorRef) extends ADSActor {
             return
         }
         val tableActor = this.context.actorOf(
-            TableActor.props(tableName, TableActor.fileName(tableName), schema, resultCollector), TableActor.actorName(tableName)
+            TableActor.props(tableName, schema, resultCollector), TableActor.actorName(tableName)
         )
         tables(tableName) = tableActor
         this.sender ! TableOpSuccessMessage(tableName, "CREATE")
@@ -99,7 +98,7 @@ class InterfaceActor(resultCollector: ActorRef) extends ADSActor {
             return
         }
         val tableActor = this.context.actorOf(
-            TableActor.props(tableName, TableActor.fileName(tableName), columns, resultCollector), TableActor.actorName(tableName)
+            TableActor.props(tableName, columns, resultCollector), TableActor.actorName(tableName)
         )
         tables(tableName) = tableActor
         this.sender ! TableOpSuccessMessage(tableName, "CREATE")
