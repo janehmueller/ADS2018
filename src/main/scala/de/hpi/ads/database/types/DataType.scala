@@ -3,6 +3,7 @@ package de.hpi.ads.database.types
 import java.io.{ObjectInputStream, ObjectOutputStream}
 
 import de.hpi.ads.implicits._
+
 trait DataType {
     // TODO handle null values with Options when writing and reading
     def writeBytes(data: Any, stream: ObjectOutputStream): Unit
@@ -23,13 +24,13 @@ trait DataType {
 object DataType {
     def fromString(dataType: String): DataType = {
         dataType.trim match {
-            case "binary" => BinaryType
+            case r"""binary\(([0-9]+)${length}\)""" => BinaryType(length.toInt)
             case "boolean" => BooleanType
             case "date" => DateType
             case "double" => DoubleType
             case "int" => IntType
-            case "string" => StringType()
             case "long" => LongType
+            case r"""string\(([0-9]+)${length}\)""" => StringType(length.toInt)
             case unknownType => throw new IllegalArgumentException(s"Encountered unknown data type: $unknownType")
         }
     }

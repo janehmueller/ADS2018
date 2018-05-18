@@ -21,7 +21,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
     }
 
     "Table Actor" should "insert values" in {
-        val schema = TableSchema("id:int;title:string")
+        val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
         val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
         tableActor ! TableInsertRowMessage(1, row, testActor)
@@ -30,7 +30,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
     }
 
     it should "return inserted values" in {
-        val schema = TableSchema("id:int;title:string")
+        val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
         val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
         tableActor ! TableInsertRowMessage(1, row, testActor)
@@ -45,7 +45,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
     }
 
     it should "select correct values with condition" in {
-        val schema = TableSchema("id:int;title:string;year:int")
+        val schema = TableSchema("id:int;title:string(255);year:int")
         val row1 = List(1, "Movie1", 2000)
         val row2 = List(2, "Movie2", 2001)
         val row3 = List(3, "Movie3", 2001)

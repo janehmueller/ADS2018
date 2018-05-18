@@ -16,7 +16,7 @@ case class TableSchema(columns: List[ColumnType]) {
 
     def columnIndices(columnNames: List[String]): List[Int] = columnNames.map(columnIndex)
 
-    def entrySize: Int = 0 // TODO
+    def entrySize: Int = columns.map(_.size).sum
 }
 
 object TableSchema {
