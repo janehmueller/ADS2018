@@ -21,6 +21,8 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         TestKit.shutdownActorSystem(system)
     }
 
+    //TODO clean up after each test, even if they fail
+
     "Table Actor" should "insert values" in {
         val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
