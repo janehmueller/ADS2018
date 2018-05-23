@@ -42,4 +42,6 @@ object LongType extends DataType {
             longData(6) << 8   |
             longData(7) << 0
     }
+
+    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Long] < b.asInstanceOf[Long]
 }

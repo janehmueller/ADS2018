@@ -19,6 +19,11 @@ trait DataType {
     def fromBytes(data: Array[Byte]): Any
 
     def byteSize: Int
+
+    def lessThan(a: Any, b: Any): Boolean
+
+    def max: Any
+    def min: Any
 }
 
 object DataType {

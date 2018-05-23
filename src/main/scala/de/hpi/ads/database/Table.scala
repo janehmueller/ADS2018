@@ -54,6 +54,23 @@ class Table(fileName: String, schema: TableSchema) {
         Files.deleteIfExists(Paths.get(fileName))
     }
 
+    def readFile(): Array[Byte] = {
+        assert(tableFile.length() < 2147483647)
+        val data: Array[Byte] = Array.ofDim[Byte](tableFile.length().toInt)
+        tableFile.seek(0)
+        tableFile.read(data)
+        data
+    }
+
+    /**
+      * Returns two roughly equally sized Bytearrays that are valid files for new tables and splitting point (part of second partition)
+     */
+    def readFileHalves(): (Array[Byte], Array[Byte], Any) = {
+        val primaryKeyMedian = getPrimaryKeyMedian()
+        //TODO when fixed row size is implemented
+        (Array[Byte](), Array[Byte](), primaryKeyMedian)
+    }
+
     /**
       * Reads the row for a given key from the table file.
       * @param key the key of the row
@@ -99,9 +116,10 @@ class Table(fileName: String, schema: TableSchema) {
         Row.fromBinary(binaryRow, schema)
     }
 
+    //TODO this is very inefficient, there should be only one read that reads everything
     def readRows(query: Row => Boolean = _ => true): List[Row] = {
         tableFile.seek(0)
-        // Use a map to overwrite rows that were updated.
+        // Use a map to skip rows that were updated.
         val readRows = MMap.empty[Any, Row]
         while (tableFile.getFilePointer < tableFile.length()) {
             val row = this.readNextRow
@@ -157,6 +175,12 @@ class Table(fileName: String, schema: TableSchema) {
         memoryPosition
     }
 
+    def rebuildTableFromData(data: Array[Byte]): Unit = {
+        assert(tableFile.length() == 0)
+        tableFile.write(data)
+        rebuildIndex()
+    }
+
     /**
       * Updates a row by overwriting it with the passed data.
       * @param key the key of the row
@@ -210,6 +234,41 @@ class Table(fileName: String, schema: TableSchema) {
         this.selectWhere(query).foreach(row => this.keyPositions.remove(row.key))
     }
 
+
+
+    def getPrimaryKeyMedian(): Any = {
+        def medianUpTo5(five: Array[Any], lt: (Any, Any) => Boolean): Any = {
+            def order2(a: Array[Any], i: Int, j: Int, lt: (Any, Any) => Boolean) = {
+                if (lt(a(j),a(i))) { val t = a(i); a(i) = a(j); a(j) = t }
+            }
+
+            def pairs(a: Array[Any], i: Int, j: Int, k: Int, l: Int, lt: (Any, Any) => Boolean) = {
+                if (lt(a(i),a(k))) { order2(a,j,k,lt); a(j) }
+                else { order2(a,i,l,lt); a(i) }
+            }
+
+            if (five.length < 2) return five(0)
+            order2(five,0,1,lt)
+            if (five.length < 4) return (
+                if (five.length==2 || lt(five(2) , five(0))) five(0)
+                else if (lt(five(1) , five(2))) five(1)
+                else five(2)
+                )
+            order2(five,2,3,lt)
+            if (five.length < 5) pairs(five,0,1,2,3,lt)
+            else if (lt(five(0) , five(2))) { order2(five,1,4,lt); pairs(five,1,4,2,3,lt) }
+            else { order2(five,3,4,lt); pairs(five,0,1,3,4,lt) }
+        }
+
+        def medianOfMedians(arr: Array[Any], lt: (Any, Any) => Boolean): Any = {
+            val medians = (arr grouped 5).map(x => medianUpTo5(x, lt)).toArray
+            if (medians.length <= 5) medianUpTo5 (medians, lt)
+            else medianOfMedians(medians, lt)
+        }
+
+        val primaryKeyValues = keyPositions.keys.toArray
+        medianOfMedians(primaryKeyValues, schema.primaryKeyColumn.dataType.lessThan)
+    }
 
 }
 

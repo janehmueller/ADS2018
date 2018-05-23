@@ -23,4 +23,6 @@ object DateType extends DataType {
     override def fromBytes(data: Array[Byte]): Date = {
         new Date(LongType.fromBytes(data))
     }
+
+    //TODO override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Date] < b.asInstanceOf[Date]
 }

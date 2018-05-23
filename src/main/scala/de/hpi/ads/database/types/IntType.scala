@@ -32,4 +32,6 @@ object IntType extends DataType {
             intData(2) << 8   |
             intData(3) << 0
     }
+
+    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Int] < b.asInstanceOf[Int]
 }

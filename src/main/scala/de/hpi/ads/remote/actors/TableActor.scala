@@ -8,7 +8,7 @@ import de.hpi.ads.remote.messages._
 object TableActor {
     def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
 
-    def fileName(tableName: String): String = s"table.$tableName.ads"
+    def fileName(tableName: String): String = s"table.$tableName"
 
     def props(table: String, schema: String, resultCollector: ActorRef): Props = {
         Props(new TableActor(table, TableSchema(schema), resultCollector))
@@ -21,6 +21,8 @@ object TableActor {
     def props(table: String, columns: TableSchema, resultCollector: ActorRef): Props = {
         Props(new TableActor(table, columns, resultCollector))
     }
+
+    case class TablePartitionReadyMessage(fileName: String, lowerBound: Any, upperBound: Any)
 }
 
 class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorRef) extends ADSActor {
@@ -28,7 +30,7 @@ class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorR
 
     // TODO: partition file names
     val tablePartitionActor: ActorRef = context.actorOf(
-        TablePartitionActor.props(tableName, fileName(tableName), schema, resultCollector))
+        TablePartitionActor.props(tableName, fileName(tableName), schema, self, resultCollector))
 
     override def postStop(): Unit = {
         super.postStop()
@@ -51,6 +53,8 @@ class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorR
         /** Table Delete */
         case msg: TableDeleteWhereMessage => tablePartitionActor ! msg
 
+        case TablePartitionReadyMessage(fileName, lB, uB) => partitionIsReady(fileName, lB, uB)
+
         /** Handle dropping the table. */
         case ShutdownMessage =>
             tablePartitionActor ! ShutdownMessage
@@ -58,5 +62,9 @@ class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorR
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")
+    }
+
+    def partitionIsReady(fileName: String, lowerBound: Any, upperBound: Any): Unit = {
+
     }
 }

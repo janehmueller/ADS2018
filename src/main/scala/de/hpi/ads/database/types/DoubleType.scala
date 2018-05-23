@@ -22,4 +22,6 @@ object DoubleType extends DataType {
     override def fromBytes(data: Array[Byte]): Double = {
         java.lang.Double.longBitsToDouble(LongType.fromBytes(data))
     }
+
+    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Double] < b.asInstanceOf[Double]
 }

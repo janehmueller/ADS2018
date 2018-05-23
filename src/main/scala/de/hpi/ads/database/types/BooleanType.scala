@@ -22,4 +22,6 @@ object BooleanType extends DataType {
         val Array(value) = data
         value == 1
     }
+
+    override def lessThan(a: Any, b: Any): Boolean = a == false
 }

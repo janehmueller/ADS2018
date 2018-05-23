@@ -8,6 +8,7 @@ import de.hpi.ads.remote.actors.ResultCollectorActor.ExpectResultsMessage
 import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
 import de.hpi.ads.remote.messages._
 
+import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 object TablePartitionActor {
@@ -15,18 +16,29 @@ object TablePartitionActor {
 
     def fileName(tableName: String): String = s"table.$tableName.ads"
 
-    def props(table: String, fileName: String, schema: TableSchema, resultCollector: ActorRef): Props = {
-        Props(new TablePartitionActor(table, fileName, schema, resultCollector))
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, None, None))
     }
+
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef,  lowerBound: Any, upperBound: Any): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, lowerBound, upperBound))
+    }
+
+    case class FillWithDataMessage(data: Array[Byte])
 }
 
-class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, resultCollector: ActorRef)
+class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any)
     extends Table(fileName, schema) with ADSActor
 {
     import TablePartitionActor._
+    import TableActor._
 
-    val children : List[ActorRef] = List()
-    val RNG = new Random()
+    val children : ListBuffer[ActorRef] = ListBuffer()
+    var partitionPoint: Any = None
+
+    override def preStart(): Unit = {
+        super.preStart()
+    }
 
     override def postStop(): Unit = {
         super.postStop()
@@ -51,6 +63,9 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         case TableDeleteWhereMessage(queryID, operator, receiver) =>
             deleteWhere(queryID, operator, receiver)
 
+        case FillWithDataMessage(data) =>
+            fillWithData(data)
+
         /** Handle dropping the table. */
         case ShutdownMessage =>
             // TODO stop children
@@ -61,30 +76,34 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def insertRow(queryID: Int, data: List[Any], receiver: ActorRef): Unit = {
+        if (!inputContainsValidKey(schema.columnNames.zip(data))) {
+            receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
+            return
+        }
         if (children.nonEmpty) {
-            // TODO: figure out which child actor should receive the row according to splitting
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableInsertRowMessage(queryID, data, receiver)
-        } else {
-            if (!inputContainsValidKey(schema.columnNames.zip(data))) {
-                receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
-                return
+            if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition), partitionPoint)) {
+                children(0) ! TableInsertRowMessage(queryID, data, receiver)
+            } else {
+                children(1) ! TableInsertRowMessage(queryID, data, receiver)
             }
+        } else {
             this.insertList(data)
             receiver ! QuerySuccessMessage(queryID)
         }
     }
 
     def insertRowWithNames(queryID: Int, data: List[(String, Any)], receiver: ActorRef): Unit = {
+        if (!inputContainsValidKey(data)) {
+            receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
+            return
+        }
         if (children.nonEmpty) {
-            // TODO: figure out which child actor should receive the row according to splitting
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableNamedInsertRowMessage(queryID, data, receiver)
-        } else {
-            if (!inputContainsValidKey(data)) {
-                receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
-                return
+            if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition)._2, partitionPoint)) {
+                children(0) ! TableInsertRowMessage(queryID, data, receiver)
+            } else {
+                children(1) ! TableInsertRowMessage(queryID, data, receiver)
             }
+        } else {
             this.insert(data)
             receiver ! QuerySuccessMessage(queryID)
         }
@@ -117,8 +136,6 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     def updateWhere(queryID: Int, data: List[(String, Any)], operator: Operator, receiver: ActorRef): Unit = {
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableUpdateWhereMessage(queryID, data, operator, receiver)
         } else {
             this.updateWhere(data, row => operator(row))
             receiver ! QuerySuccessMessage(queryID)
@@ -127,15 +144,28 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     def deleteWhere(queryID: Int, operator: Operator, receiver: ActorRef): Unit = {
         // TODO: figure out how to delete data from file without breaking reading the file
-        // TODO: (e.g. write a Boolean in the row "header" that indicates if this row was deleted)
+        // TODO: maintain a second file with a boolean/byte for each row that indicates if it was deleted or not
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
-            // for now: give it to random child
-            children(RNG.nextInt(children.size)) ! TableDeleteWhereMessage(queryID, operator, receiver)
         } else {
             this.deleteWhere(row => operator(row))
             receiver ! QuerySuccessMessage(queryID)
         }
+    }
+
+    def splitActor() : Unit = {
+        val p: (Array[Byte], Array[Byte], Any) = readFileHalves()
+        val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, resultCollector, lowerBound, p._3), fileName + '0')
+        val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, resultCollector, p._3, upperBound), fileName + '1')
+        children += leftRangeActor
+        children += rightRangeActor
+        leftRangeActor ! FillWithDataMessage(p._1)
+        rightRangeActor ! FillWithDataMessage(p._2)
+    }
+
+    def fillWithData(bytes: Array[Byte]) = {
+        rebuildTableFromData(bytes)
+        tableActor ! TablePartitionReadyMessage(fileName, lowerBound, upperBound)
     }
 
 }

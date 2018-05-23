@@ -4,7 +4,9 @@ case class TableSchema(columns: List[ColumnType]) {
     /**
       * Position of primary key.
       */
-    val primaryKeyPosition = 0
+    val primaryKeyPosition: Int = 0
+
+    def primaryKeyColumn: ColumnType = columns(primaryKeyPosition)
 
     def numValues: Int = columns.length
 
@@ -12,9 +14,9 @@ case class TableSchema(columns: List[ColumnType]) {
 
     def columnNames: List[String] = columns.map(_.name)
 
-    def columnIndex(columnName: String): Int = columnNames.indexOf(columnName)
+    def columnPosition(columnName: String): Int = columnNames.indexOf(columnName)
 
-    def columnIndices(columnNames: List[String]): List[Int] = columnNames.map(columnIndex)
+    def columnPositions(columnNames: List[String]): List[Int] = columnNames.map(columnPosition)
 
     def entrySize: Int = columns.map(_.size).sum
 }

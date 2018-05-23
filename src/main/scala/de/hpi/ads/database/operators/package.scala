@@ -21,13 +21,13 @@ import java.util.Date
 package object operators {
     trait Operator {
         def column: String
-        def value: Any
 
         def compare(other: Any): Boolean
 
         def compareAny(other: Any): Boolean = {
             // TODO: support comparisons like < for different data types (e.g., int and long)
-            other.getClass == value.getClass && this.compare(other)
+            // very unimportant
+            this.compare(other)
         }
 
         def apply(row: Row): Boolean = this.compareAny(row.getByName(column))
@@ -39,6 +39,8 @@ package object operators {
             throw new NotImplementedError()
         }
     }
+
+    //TODO allmost of of these seem very slow, might be worth to refactor so that they just return a comparator of the appropiate data type that is then applied
 
     case class EqOperator(column: String, value: Any) extends Operator {
         override def compare(other: Any): Boolean = other == value
@@ -94,6 +96,18 @@ package object operators {
             case x: Int => x >= value.asInstanceOf[Int]
             case x: Long => x >= value.asInstanceOf[Long]
             case x: String => x >= value.asInstanceOf[String]
+            case _ => false
+        }
+    }
+
+    case class InRangeOperator(column: String, lowerBound: Any, upperBound: Any) extends Operator {
+        override def compare(other: Any): Boolean = other match {
+            case x: Boolean => x <= upperBound.asInstanceOf[Boolean] && x >= lowerBound.asInstanceOf[Boolean]
+            case x: Date => x.getTime <= upperBound.asInstanceOf[Date].getTime && x.getTime >= lowerBound.asInstanceOf[Date].getTime
+            case x: Double => x <= upperBound.asInstanceOf[Double] && x >= lowerBound.asInstanceOf[Double]
+            case x: Int => x <= upperBound.asInstanceOf[Int] && x >= lowerBound.asInstanceOf[Int]
+            case x: Long => x <= upperBound.asInstanceOf[Long] && x >= lowerBound.asInstanceOf[Long]
+            case x: String => x <= upperBound.asInstanceOf[String] && x >= lowerBound.asInstanceOf[String]
             case _ => false
         }
     }

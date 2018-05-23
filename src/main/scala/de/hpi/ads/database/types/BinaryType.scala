@@ -22,4 +22,6 @@ case class BinaryType(length: Int = 255) extends DataType {
     override def toBytes(data: Any): Array[Byte] = data.asInstanceOf[Array[Byte]]
 
     override def fromBytes(data: Array[Byte]): Array[Byte] = data
+
+    //TODO override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Int] < b.asInstanceOf[Int]
 }

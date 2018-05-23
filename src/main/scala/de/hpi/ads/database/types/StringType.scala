@@ -22,4 +22,6 @@ case class StringType(length: Int = 255) extends DataType {
     override def fromBytes(data: Array[Byte]): String = {
         new String(data)
     }
+
+    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[String] < b.asInstanceOf[String]
 }
