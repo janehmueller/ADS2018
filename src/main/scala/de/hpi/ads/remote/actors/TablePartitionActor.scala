@@ -1,6 +1,6 @@
 package de.hpi.ads.remote.actors
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorRef, PoisonPill, Props}
 import de.hpi.ads.database.operators.Operator
 import de.hpi.ads.database.Table
 import de.hpi.ads.database.types.TableSchema
@@ -42,8 +42,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     override def postStop(): Unit = {
         super.postStop()
-        this.cleanUp()
-        // TODO: stop child actors (maybe via Poison Pill)
+        children.foreach(c => c ! PoisonPill)
     }
 
     def receive: Receive = {
@@ -68,8 +67,9 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
         /** Handle dropping the table. */
         case ShutdownMessage =>
-            // TODO stop children
+            this.cleanUp()
             context.stop(this.self)
+            children.foreach(c => c ! ShutdownMessage)
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")
@@ -78,6 +78,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     def insertRow(queryID: Int, data: List[Any], receiver: ActorRef): Unit = {
         if (!inputContainsValidKey(schema.columnNames.zip(data))) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
+            tableActor ! InsertionDoneMessage(queryID)
             return
         }
         if (children.nonEmpty) {
@@ -88,6 +89,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             }
         } else {
             this.insertList(data)
+            tableActor ! InsertionDoneMessage(queryID)
             receiver ! QuerySuccessMessage(queryID)
         }
     }
@@ -95,6 +97,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     def insertRowWithNames(queryID: Int, data: List[(String, Any)], receiver: ActorRef): Unit = {
         if (!inputContainsValidKey(data)) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
+            tableActor ! InsertionDoneMessage(queryID)
             return
         }
         if (children.nonEmpty) {
@@ -105,6 +108,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             }
         } else {
             this.insert(data)
+            tableActor ! InsertionDoneMessage(queryID)
             receiver ! QuerySuccessMessage(queryID)
         }
     }
@@ -157,10 +161,13 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         val p: (Array[Byte], Array[Byte], Any) = readFileHalves()
         val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, resultCollector, lowerBound, p._3), fileName + '0')
         val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, resultCollector, p._3, upperBound), fileName + '1')
+        tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, p._3)
         children += leftRangeActor
         children += rightRangeActor
+
         leftRangeActor ! FillWithDataMessage(p._1)
         rightRangeActor ! FillWithDataMessage(p._2)
+        this.cleanUp()
     }
 
     def fillWithData(bytes: Array[Byte]) = {
