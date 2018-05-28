@@ -3,8 +3,8 @@ package de.hpi.ads.remote.actors
 import akka.actor.{ActorRef, PoisonPill, Props}
 import de.hpi.ads.database.types.{ColumnType, TableSchema}
 import de.hpi.ads.remote.actors.ResultCollectorActor.PrepareNewQueryResultsMessage
-import scala.collection.mutable.{Map => MMap}
 
+import scala.collection.mutable.{ArrayBuffer, Map => MMap}
 import de.hpi.ads.remote.messages._
 
 object TableActor {
@@ -109,7 +109,25 @@ class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorR
     def rebalance(): Unit = {
         tablePartitionActor ! PoisonPill
         // build balanced tree off of partitionCollection
+        val sortedSeq = partitionCollection.toSeq.sortBy(_._1):_*
+        //if this does not know how to compare Any, use comparison methods that we have elsewhere
+        //also maybe we actually dont want a HashMap in the first place, if we have time on insertion but not now
+        val treeMap = MMap[(Any, Any), (Boolean, Any)]()
+        buildTree(sortedSeq, treeMap, 0, sortedSeq.size)
         // build new topPartitionActor who gets entire tree and builds children recursively
+        tablePartitionActor = context.actorOf(
+            TablePartitionActor.props(tableName, fileName(tableName), schema, self, resultCollector, None, None, treeMap))
         currentlyRebalancing = false
+    }
+
+    def buildTree(sortedSeq: Seq[((Any, Any), String)], TreeMap: MMap[(Any, Any), (Boolean, Any)], low: Int, high: Int): Unit = {
+        if (low >= high-1) {
+            TreeMap += (sortedSeq(low)._1._1, sortedSeq(low)._1._2) -> (true, sortedSeq(low)._2)
+        } else {
+            //high is at least low+2, so we need to take care of >=2 entries, so split
+            TreeMap += (sortedSeq(low)._1._1, sortedSeq(high-1)._1._2) -> (false, sortedSeq((low+high)/2)._1._1)
+            buildTree(sortedSeq, TreeMap, low, (low+high)/2)
+            buildTree(sortedSeq, TreeMap, (low+high)/2, high)
+        }
     }
 }
