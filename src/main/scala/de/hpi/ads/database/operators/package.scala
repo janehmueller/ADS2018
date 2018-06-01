@@ -22,12 +22,12 @@ package object operators {
     trait Operator {
         def column: String
 
+        def value: Any
+
         def compare(other: Any): Boolean
 
         def compareAny(other: Any): Boolean = {
-            // TODO: support comparisons like < for different data types (e.g., int and long)
-            // very unimportant
-            this.compare(other)
+            other.getClass == value.getClass && this.compare(other)
         }
 
         def apply(row: Row): Boolean = this.compareAny(row.getByName(column))
@@ -40,7 +40,7 @@ package object operators {
         }
     }
 
-    //TODO allmost of of these seem very slow, might be worth to refactor so that they just return a comparator of the appropiate data type that is then applied
+    //TODO almost of of these seem very slow, might be worth to refactor so that they just return a comparator of the appropiate data type that is then applied
 
     case class EqOperator(column: String, value: Any) extends Operator {
         override def compare(other: Any): Boolean = other == value
@@ -101,6 +101,8 @@ package object operators {
     }
 
     case class InRangeOperator(column: String, lowerBound: Any, upperBound: Any) extends Operator {
+        override def value: Any = None
+
         override def compare(other: Any): Boolean = other match {
             case x: Boolean => x <= upperBound.asInstanceOf[Boolean] && x >= lowerBound.asInstanceOf[Boolean]
             case x: Date => x.getTime <= upperBound.asInstanceOf[Date].getTime && x.getTime >= lowerBound.asInstanceOf[Date].getTime
