@@ -33,7 +33,7 @@ package object messages {
     case class TableInsertRowMessage(queryID: Int, data: List[Any], receiver: ActorRef)
     case class TableNamedInsertRowMessage(queryID: Int, data: List[(String, Any)], receiver: ActorRef)
     /** Table Read */
-    case class TableSelectWhereMessage(queryID: Int, projection: List[String], operator: Operator, receiver: ActorRef)
+    case class TableSelectWhereMessage(queryID: Int, projection: List[String], operator: Operator, var receiver: ActorRef)
     /** Table Update */
     case class TableUpdateWhereMessage(queryID: Int, data: List[(String, Any)], operator: Operator, receiver: ActorRef)
     /** Table Delete */
