@@ -1,32 +1,32 @@
 package de.hpi.ads.remote.actors
 
+import java.nio.file.{Files, Paths}
+
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.testkit.{ImplicitSender, TestKit}
 import de.hpi.ads.database.operators.EqOperator
 import de.hpi.ads.database.types._
-import de.hpi.ads.remote.actors.ResultCollectorActor.PrepareNewQueryResultsMessage
 import de.hpi.ads.remote.messages._
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with ImplicitSender
-    with FlatSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach
+    with FlatSpecLike with Matchers with BeforeAndAfterAll
 {
-    val tableFileName = "tableActorTest.ads"
-    val tableFileFullPath: String = s"src/test/resources/$tableFileName"
+    val tableName = "tableActorTest"
+    val tableFileName = s"$tableName.table.ads"
 
     system.eventStream.setLogLevel(Logging.WarningLevel)
 
     override def afterAll: Unit = {
         TestKit.shutdownActorSystem(system)
+        Files.deleteIfExists(Paths.get(tableFileName))
     }
-
-    //TODO clean up after each test, even if they fail
 
     "Table Actor" should "insert values" in {
         val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
-        val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
+        val tableActor = system.actorOf(TableActor.props(tableName, schema))
         tableActor ! TableInsertRowMessage(1, row, testActor)
         expectMsg(QuerySuccessMessage(1))
         tableActor ! ShutdownMessage
@@ -35,11 +35,10 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
     it should "return inserted values" in {
         val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
-        val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
+        val tableActor = system.actorOf(TableActor.props(tableName, schema))
         tableActor ! TableInsertRowMessage(1, row, testActor)
         expectMsg(QuerySuccessMessage(1))
         tableActor ! TableSelectWhereMessage(2, List("id", "title"), EqOperator("id", 1), testActor)
-        expectMsgType[PrepareNewQueryResultsMessage]
         val response = expectMsgType[QueryResultMessage]
         response.queryID shouldBe 2
         response.result should have length 1
@@ -53,7 +52,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         val row2 = List(2, "Movie2", 2001)
         val row3 = List(3, "Movie3", 2001)
         val row4 = List(4, "Movie4", 2000)
-        val tableActor = system.actorOf(TableActor.props("test", schema, testActor))
+        val tableActor = system.actorOf(TableActor.props(tableName, schema))
         tableActor ! TableInsertRowMessage(1, row1, testActor)
         expectMsg(QuerySuccessMessage(1))
         tableActor ! TableInsertRowMessage(2, row2, testActor)
@@ -63,7 +62,6 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
         tableActor ! TableInsertRowMessage(4, row4, testActor)
         expectMsg(QuerySuccessMessage(4))
         tableActor ! TableSelectWhereMessage(5, List("title"), EqOperator("year", 2001), testActor)
-        expectMsgType[PrepareNewQueryResultsMessage]
         val response = expectMsgType[QueryResultMessage]
         response.result should have length 2
         response.result shouldEqual List(List("Movie2"), List("Movie3"))

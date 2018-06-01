@@ -8,14 +8,14 @@ class TableTest extends FlatSpec with Matchers {
     val tableFileFullPath: String = s"src/test/resources/$tableFileName"
 
     "Table" should "insert and read correctly" in {
-        val schema = TableSchema(List(
+        val schema = TableSchema(IndexedSeq(
             ColumnType("id", IntType),
             ColumnType("title", StringType()),
             ColumnType("long", LongType),
             ColumnType("double", DoubleType)))
         val row1 = List(1, "abcde", 34927L, 5.8)
         val row2 = List(2, "fgr", 344366927L, 4.9)
-        val table = Table(tableFileName, schema)
+        val table = Table(tableFileFullPath, schema)
         table.insertList(row1)
         table.insertList(row2)
         val readRow1 = table.select(1).map(_.toList)
