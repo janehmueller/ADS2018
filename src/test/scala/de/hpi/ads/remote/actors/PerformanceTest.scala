@@ -53,7 +53,7 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
         println(s"Elapsed time (Simple read): ${(tE - tS)/1000000000.0}s")
 
         tableActor ! TableSelectWhereMessage(1000001, List("id", "title"), EqOperator("id", 1), testActor)
-        val response = expectMsgType[QueryResultMessage]//(20.seconds)
+        val response = expectMsgType[QueryResultMessage](20.seconds)
         val t2 = System.nanoTime()
         println(s"Elapsed time (Reading): ${(t2 - tE)/1000000000.0}s")
 
