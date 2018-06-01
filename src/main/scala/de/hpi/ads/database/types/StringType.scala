@@ -1,26 +1,23 @@
 package de.hpi.ads.database.types
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Arrays
 
 case class StringType(length: Int = 255) extends DataType {
-    // TODO use length
-    override def byteSize: Int = length * 4 // TODO support UTF-8 or only ASCII?
+    override def byteSize: Int = length * 4
 
-    override def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
-        val internalData = data.asInstanceOf[String]
-        stream.writeObject(internalData)
-    }
-
-    override def readBytes(stream: ObjectInputStream): String = {
-        stream.readObject().asInstanceOf[String]
-    }
-
+    // TODO prepend length
     override def toBytes(data: Any): Array[Byte] = {
-        data.asInstanceOf[String].getBytes()
+        val binaryData = data.asInstanceOf[String].getBytes()
+        Arrays.copyOf(binaryData, this.byteSize)
     }
 
     override def fromBytes(data: Array[Byte]): String = {
-        new String(data)
+        // remove null byte padding
+        var i = data.length - 1
+        while (i >= 0 && data(i) == 0) {
+            i -= 1
+        }
+        new String(data.slice(0, i + 1))
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[String] < b.asInstanceOf[String]

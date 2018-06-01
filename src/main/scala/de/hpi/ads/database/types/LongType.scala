@@ -1,18 +1,7 @@
 package de.hpi.ads.database.types
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
 object LongType extends DataType {
     override def byteSize = 8
-
-    override def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
-        val internalData = data.asInstanceOf[Long]
-        stream.writeLong(internalData)
-    }
-
-    override def readBytes(stream: ObjectInputStream): Long = {
-        stream.readLong
-    }
 
     override def toBytes(data: Any): Array[Byte] = {
         val longValue = data.asInstanceOf[Long]
@@ -30,6 +19,7 @@ object LongType extends DataType {
     }
 
     override def fromBytes(data: Array[Byte]): Long = {
+        this.testInputLength(data)
         val longData = data
             .map(0xff & _)
             .map(_.asInstanceOf[Long])

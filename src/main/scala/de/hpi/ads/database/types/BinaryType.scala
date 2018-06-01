@@ -1,41 +1,29 @@
 package de.hpi.ads.database.types
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
+import java.util.Arrays
 
 case class BinaryType(length: Int = 255) extends DataType {
-    // TODO use length
     override def byteSize: Int = length
 
-    override def writeBytes(data: Any, stream: ObjectOutputStream): Unit = {
-        val internalData = data.asInstanceOf[Array[Byte]]
-        stream.writeInt(internalData.length)
-        stream.write(internalData)
+    // TODO prepend length
+    override def toBytes(data: Any): Array[Byte] = {
+        val binaryData = data.asInstanceOf[Array[Byte]]
+        Arrays.copyOf(binaryData, this.length)
     }
 
-    override def readBytes(stream: ObjectInputStream): Array[Byte] = {
-        val numBytes = stream.readInt()
-        val binaryData = new Array[Byte](numBytes)
-        stream.readFully(binaryData)
-        binaryData
+    override def fromBytes(data: Array[Byte]): Array[Byte] = {
+        Arrays.copyOf(data, this.length)
     }
 
-    override def toBytes(data: Any): Array[Byte] = data.asInstanceOf[Array[Byte]]
-
-    override def fromBytes(data: Array[Byte]): Array[Byte] = data
-
-    override def lessThan(a: Any, b: Any): Boolean = true
+    override def lessThan(a: Any, b: Any): Boolean = {
+        throw new UnsupportedOperationException("Binary data type does not support comparisons.")
+    }
 
     override def max(values: Any*): Array[Byte] = {
-        values
-            .headOption
-            .map(_.asInstanceOf[Array[Byte]])
-            .getOrElse(Array())
+        throw new UnsupportedOperationException("Binary data type does not support comparisons.")
     }
 
     override def min(values: Any*): Array[Byte] = {
-        values
-            .headOption
-            .map(_.asInstanceOf[Array[Byte]])
-            .getOrElse(Array())
+        throw new UnsupportedOperationException("Binary data type does not support comparisons.")
     }
 }

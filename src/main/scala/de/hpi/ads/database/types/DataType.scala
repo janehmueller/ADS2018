@@ -1,15 +1,8 @@
 package de.hpi.ads.database.types
 
-import java.io.{ObjectInputStream, ObjectOutputStream}
-
 import de.hpi.ads.implicits._
 
 trait DataType {
-    // TODO handle null values with Options when writing and reading
-    def writeBytes(data: Any, stream: ObjectOutputStream): Unit
-
-    def readBytes(stream: ObjectInputStream): Any
-
     /**
       * Byte conversions from
       * https://www.daniweb.com/programming/software-development/code/216874/primitive-types-as-byte-arrays
@@ -17,6 +10,10 @@ trait DataType {
     def toBytes(data: Any): Array[Byte]
 
     def fromBytes(data: Array[Byte]): Any
+
+    def testInputLength(data: Array[Byte]): Unit = {
+        assert(data.length == this.byteSize, s"Binary data must have size ${this.byteSize} but had size ${data.length}.")
+    }
 
     def byteSize: Int
 
