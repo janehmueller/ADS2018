@@ -4,6 +4,7 @@ import java.io.RandomAccessFile
 import java.nio.file.{Files, Paths}
 
 import de.hpi.ads.database.types.TableSchema
+import de.hpi.ads.utils.medianOfMedians
 
 import scala.collection.mutable.{Map => MMap}
 
@@ -55,10 +56,10 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def readFile(): Array[Byte] = {
-        assert(tableFile.length() < 2147483647)
-        val data: Array[Byte] = Array.ofDim[Byte](tableFile.length().toInt)
+        assert(tableFile.length() < Integer.MAX_VALUE)
+        val data = new Array[Byte](tableFile.length().toInt)
         tableFile.seek(0)
-        tableFile.read(data)
+        tableFile.readFully(data)
         data
     }
 
@@ -66,7 +67,7 @@ class Table(fileName: String, schema: TableSchema) {
       * Returns two roughly equally sized Bytearrays that are valid files for new tables and splitting point (part of second partition)
      */
     def readFileHalves(): (Array[Byte], Array[Byte], Any) = {
-        val primaryKeyMedian = getPrimaryKeyMedian()
+        val primaryKeyMedian = this.getPrimaryKeyMedian
         //TODO when fixed row size is implemented
         (Array[Byte](), Array[Byte](), primaryKeyMedian)
     }
@@ -236,36 +237,7 @@ class Table(fileName: String, schema: TableSchema) {
 
 
 
-    def getPrimaryKeyMedian(): Any = {
-        def medianUpTo5(five: Array[Any], lt: (Any, Any) => Boolean): Any = {
-            def order2(a: Array[Any], i: Int, j: Int, lt: (Any, Any) => Boolean) = {
-                if (lt(a(j),a(i))) { val t = a(i); a(i) = a(j); a(j) = t }
-            }
-
-            def pairs(a: Array[Any], i: Int, j: Int, k: Int, l: Int, lt: (Any, Any) => Boolean) = {
-                if (lt(a(i),a(k))) { order2(a,j,k,lt); a(j) }
-                else { order2(a,i,l,lt); a(i) }
-            }
-
-            if (five.length < 2) return five(0)
-            order2(five,0,1,lt)
-            if (five.length < 4) return (
-                if (five.length==2 || lt(five(2) , five(0))) five(0)
-                else if (lt(five(1) , five(2))) five(1)
-                else five(2)
-                )
-            order2(five,2,3,lt)
-            if (five.length < 5) pairs(five,0,1,2,3,lt)
-            else if (lt(five(0) , five(2))) { order2(five,1,4,lt); pairs(five,1,4,2,3,lt) }
-            else { order2(five,3,4,lt); pairs(five,0,1,3,4,lt) }
-        }
-
-        def medianOfMedians(arr: Array[Any], lt: (Any, Any) => Boolean): Any = {
-            val medians = (arr grouped 5).map(x => medianUpTo5(x, lt)).toArray
-            if (medians.length <= 5) medianUpTo5 (medians, lt)
-            else medianOfMedians(medians, lt)
-        }
-
+    def getPrimaryKeyMedian: Any = {
         val primaryKeyValues = keyPositions.keys.toArray
         medianOfMedians(primaryKeyValues, schema.primaryKeyColumn.dataType.lessThan)
     }
