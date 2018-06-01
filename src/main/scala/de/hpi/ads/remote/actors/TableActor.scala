@@ -8,7 +8,7 @@ import de.hpi.ads.remote.messages._
 object TableActor {
     def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
 
-    def fileName(tableName: String): String = s"table.$tableName"
+    def fileName(tableName: String): String = s"table.$tableName.ads"
 
     def props(table: String, schema: String, resultCollector: ActorRef): Props = {
         Props(new TableActor(table, TableSchema(schema), resultCollector))
@@ -30,7 +30,7 @@ class TableActor(tableName: String, schema: TableSchema, resultCollector: ActorR
 
     // TODO: partition file names
     val tablePartitionActor: ActorRef = context.actorOf(
-        TablePartitionActor.props(tableName, fileName(tableName), schema, self, resultCollector))
+        TablePartitionActor.props(tableName, fileName(tableName), schema, this.self, resultCollector))
 
     override def postStop(): Unit = {
         super.postStop()
