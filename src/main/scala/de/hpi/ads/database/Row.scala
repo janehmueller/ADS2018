@@ -1,10 +1,8 @@
 package de.hpi.ads.database
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream, ObjectInputStream, ObjectOutputStream}
-
 import de.hpi.ads.database.types.TableSchema
 
-import scala.collection.mutable.{MutableList => MList}
+import scala.collection.mutable.{IndexedSeq => MIndexedSeq}
 import scala.language.dynamics
 
 class Row(schema: TableSchema) extends Dynamic {
@@ -13,7 +11,7 @@ class Row(schema: TableSchema) extends Dynamic {
         .zipWithIndex
         .toMap
 
-    val data: MList[Any] = MList.fill(schema.columns.length)(null)
+    val data: MIndexedSeq[Any] = MIndexedSeq.fill(schema.columns.length)(null)
 
     def selectDynamic(name: String): Any = this.getByName(name)
 
@@ -56,16 +54,11 @@ class Row(schema: TableSchema) extends Dynamic {
       * @return byte array that represents the row
       */
     def toBytes: Array[Byte] = {
-        val byteStream = new ByteArrayOutputStream()
-        val stream = new ObjectOutputStream(byteStream)
-        schema.columns.zip(this.data).foreach { case (columnType, columnData) =>
-            columnType.writeBytes(columnData, stream)
-        }
-        stream.flush()
-        val byteData = byteStream.toByteArray
-        stream.close()
-        byteStream.close()
-        byteData
+        val binaryData = this.schema
+            .columnsWithIndex
+            .map { case (column, index) => column.toBytes(this.data(index)) }
+            .reduce(_ ++ _)
+        binaryData
     }
 
     /**
@@ -73,13 +66,16 @@ class Row(schema: TableSchema) extends Dynamic {
       * @param data serialized row that will be read
       */
     def readBytes(data: Array[Byte]): Unit = {
-        val byteStream = new ByteArrayInputStream(data)
-        val stream = new ObjectInputStream(byteStream)
-        schema.columns.zipWithIndex.foreach { case (columnType, columnIndex) =>
-            this.data(columnIndex) = columnType.readBytes(stream)
+        var byteIndex = 0
+        var columnIndex = 0
+        val columns = this.schema.columns
+        while (byteIndex < data.length) {
+            val column = columns(columnIndex)
+            val columnBinaryData = data.slice(byteIndex, byteIndex + column.size)
+            this.data(columnIndex) = column.fromBytes(columnBinaryData)
+            columnIndex += 1
+            byteIndex += column.size
         }
-        stream.close()
-        byteStream.close()
     }
 
     /**
@@ -110,6 +106,7 @@ object Row {
       * @return the created row object
       */
     def fromBinary(data: Array[Byte], schema: TableSchema): Row = {
+        assert(data.length == schema.rowSize, s"Byte array must have row size ${schema.rowSize} but had size ${data.length}.")
         val row = new Row(schema)
         row.readBytes(data)
         row
@@ -139,5 +136,16 @@ object Row {
             .zipWithIndex
             .foreach { case (value, index) => row.put(index, value) }
         row
+    }
+
+    def header(deleted: Boolean = false): Byte = {
+        var header = 0x00
+        val deletedFlag = if (deleted) 0 else 1
+        header += deletedFlag & 0x01
+        header.toByte
+    }
+
+    def isDeleted(header: Byte): Boolean = {
+        (header & 0x01) == 0
     }
 }
