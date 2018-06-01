@@ -16,26 +16,26 @@ object TablePartitionActor {
 
     def fileName(tableName: String): String = s"table.$tableName.ads"
 
-    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef): Props = {
-        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, None, None))
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, None, None))
     }
 
-    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any): Props = {
-        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, lowerBound, upperBound))
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, lowerBound, upperBound))
     }
 
-    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any, data: Array[Byte]): Props = {
-        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, lowerBound, upperBound, data))
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any, data: Array[Byte]): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, lowerBound, upperBound, data))
     }
 
-    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any, hierarchy: MMap[(Any, Any), (Boolean, Any)]): Props = {
-        Props(new TablePartitionActor(table, fileName, schema, tableActor, resultCollector, lowerBound, upperBound, hierarchy))
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any, hierarchy: MMap[(Any, Any), (Boolean, Any)]): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, lowerBound, upperBound, hierarchy))
     }
 
     case class FillWithDataMessage(data: Array[Byte])
 }
 
-class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any)
+class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any)
     extends Table(fileName, schema) with ADSActor
 {
     import TablePartitionActor._
@@ -44,13 +44,21 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     val children : ListBuffer[ActorRef] = ListBuffer()
     var partitionPoint: Any = None
 
-    def this(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any, initdata: Array[Byte]) = {
-        this(tableName, fileName, schema, tableActor, resultCollector, lowerBound, upperBound)
+    def this(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any, initdata: Array[Byte]) = {
+        this(tableName, fileName, schema, tableActor, lowerBound, upperBound)
         fillWithData(initdata)
     }
 
-    def this(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, resultCollector: ActorRef, lowerBound: Any, upperBound: Any, hierarchy: MMap[(Any, Any), (Boolean, Any)]) = {
-        this(tableName, fileName, schema, tableActor, resultCollector, lowerBound, upperBound)
+    def this(
+        tableName: String,
+        fileName: String,
+        schema: TableSchema,
+        tableActor: ActorRef,
+        lowerBound: Any,
+        upperBound: Any,
+        hierarchy: MMap[(Any, Any), (Boolean, Any)]
+    ) = {
+        this(tableName, fileName, schema, tableActor, lowerBound, upperBound)
         val entry = hierarchy((lowerBound, upperBound))
         if (entry._1) {
             //nothing to do
@@ -58,17 +66,17 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             //construct child actors
             partitionPoint = entry._2
             if (hierarchy((lowerBound, partitionPoint))._1) {
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, resultCollector, lowerBound, partitionPoint), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, lowerBound, partitionPoint), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
                 children += leftRangeActor
             } else {
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, resultCollector, lowerBound, partitionPoint, hierarchy), fileName + "_" + partitionPoint)
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, lowerBound, partitionPoint, hierarchy), fileName + "_" + partitionPoint)
                 children += leftRangeActor
             }
             if (hierarchy((partitionPoint, upperBound))._1) {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, resultCollector, partitionPoint, upperBound), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
                 children += rightRangeActor
             } else {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, resultCollector, partitionPoint, upperBound, hierarchy), fileName + "__" + partitionPoint)
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, partitionPoint, upperBound, hierarchy), fileName + "__" + partitionPoint)
                 children += rightRangeActor
             }
         }
@@ -80,7 +88,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     override def postStop(): Unit = {
         super.postStop()
-        children.foreach(c => c ! PoisonPill)
+        children.foreach(_ ! PoisonPill)
     }
 
     def receive: Receive = {
@@ -90,7 +98,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
         /** Table Read */
         case TableSelectWhereMessage(queryID, projection, operator, receiver) =>
-            selectWhere(queryID, projection, operator, resultCollector)
+            selectWhere(queryID, projection, operator, receiver)
 
         /** Table Update */
         case TableUpdateWhereMessage(queryID, data, operator, receiver) =>
@@ -106,15 +114,15 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         /** Handle dropping the table. */
         case ShutdownMessage =>
             this.cleanUp()
+            children.foreach(_ ! ShutdownMessage) // TODO: is this needed when we already send a poison pill in postStop?
             context.stop(this.self)
-            children.foreach(c => c ! ShutdownMessage)
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")
     }
 
     def insertRow(queryID: Int, data: List[Any], receiver: ActorRef): Unit = {
-        if (!inputContainsValidKey(schema.columnNames.zip(data))) {
+        if (!inputContainsValidKey(schema.columnNames.toList.zip(data))) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
             tableActor ! InsertionDoneMessage(queryID)
             return
@@ -196,16 +204,16 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def splitActor() : Unit = {
-        val p: (Array[Byte], Array[Byte], Any) = readFileHalves()
-        tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, p._3)
-        val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, resultCollector, lowerBound, p._3, p._1), fileName + '0')
-        val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, resultCollector, p._3, upperBound, p._2), fileName + '1')
+        val (half1, half2, keyMedian) = this.readFileHalves
+        tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, keyMedian)
+        val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, lowerBound, keyMedian, half1), fileName + '0')
+        val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, keyMedian, upperBound, half2), fileName + '1')
         children += leftRangeActor
         children += rightRangeActor
         this.cleanUp()
     }
 
-    def fillWithData(bytes: Array[Byte]) = {
+    def fillWithData(bytes: Array[Byte]): Unit = {
         rebuildTableFromData(bytes)
         tableActor ! TablePartitionReadyMessage(fileName, lowerBound, upperBound)
     }

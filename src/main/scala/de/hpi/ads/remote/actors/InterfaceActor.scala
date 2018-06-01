@@ -18,11 +18,11 @@ object InterfaceActor {
         queryCounter - 1
     }
 
-    def props(resultCollector: ActorRef): Props = Props(new InterfaceActor(resultCollector))
+    def props: Props = Props(new InterfaceActor())
 
     /** Table Management */
     case class CreateTableMessage(tableName: String, schema: String)
-    case class CreateTableWithTypesMessage(tableName: String, columns: List[ColumnType])
+    case class CreateTableWithTypesMessage(tableName: String, columns: IndexedSeq[ColumnType])
     case class DeleteTableMessage(tableName: String)
 
     /** Table Create */
@@ -39,7 +39,7 @@ object InterfaceActor {
     case class DeleteWhereMessage(tableName: String, operator: Operator)
 }
 
-class InterfaceActor(resultCollector: ActorRef) extends ADSActor {
+class InterfaceActor() extends ADSActor {
     import InterfaceActor._
 
     val tables: MMap[String, ActorRef] = MMap.empty
@@ -75,19 +75,19 @@ class InterfaceActor(resultCollector: ActorRef) extends ADSActor {
             return
         }
         val tableActor = this.context.actorOf(
-            TableActor.props(tableName, schema, resultCollector), TableActor.actorName(tableName)
+            TableActor.props(tableName, schema), TableActor.actorName(tableName)
         )
         tables(tableName) = tableActor
         this.sender ! TableOpSuccessMessage(tableName, "CREATE")
     }
 
-    def createTable(tableName: String, columns: List[ColumnType]): Unit = {
+    def createTable(tableName: String, columns: IndexedSeq[ColumnType]): Unit = {
         if (tableExists(tableName)) {
             this.sender() ! TableOpFailureMessage(tableName, "CREATE", "Table already exists!")
             return
         }
         val tableActor = this.context.actorOf(
-            TableActor.props(tableName, columns, resultCollector), TableActor.actorName(tableName)
+            TableActor.props(tableName, columns), TableActor.actorName(tableName)
         )
         tables(tableName) = tableActor
         this.sender ! TableOpSuccessMessage(tableName, "CREATE")

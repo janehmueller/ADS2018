@@ -10,14 +10,13 @@ import de.hpi.ads.remote.actors._
 object Main {
     def main(args: Array[String]): Unit = {
         val actorSystem = ActorSystem("ActorDatabaseSystem")
-        val resultCollector = actorSystem.actorOf(ResultCollectorActor.props(), ResultCollectorActor.defaultName)
-        val interfaceActor = actorSystem.actorOf(InterfaceActor.props(resultCollector), InterfaceActor.defaultName)
+        val interfaceActor = actorSystem.actorOf(InterfaceActor.props, InterfaceActor.defaultName)
         val userActor = actorSystem.actorOf(UserActor.props(interfaceActor), UserActor.defaultName)
         userActor ! ExecuteCommandMessage(CreateTableMessage("actors", "id:string(255);name:string(255);surname:string(255)"))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("1", "Max", "Mustermann")))
         userActor ! ExecuteCommandMessage(InsertRowMessage("actors", List("2", "Max", "Metermann")))
         userActor ! ExecuteCommandMessage(SelectWhereMessage("actors", List("id", "name", "surname"), EqOperator("name", "Max")))
-        val movieTypes = List(
+        val movieTypes = IndexedSeq(
             ColumnType("id", IntType),
             ColumnType("name", StringType()),
             ColumnType("rating", DoubleType)
@@ -36,8 +35,7 @@ object Main {
 
     def startActorSystem(): ActorRef = {
         val actorSystem = ActorSystem("ActorDatabaseSystem")
-        val resultCollector = actorSystem.actorOf(ResultCollectorActor.props(), ResultCollectorActor.defaultName)
-        val interfaceActor = actorSystem.actorOf(InterfaceActor.props(resultCollector), InterfaceActor.defaultName)
+        val interfaceActor = actorSystem.actorOf(InterfaceActor.props, InterfaceActor.defaultName)
         val userActor = actorSystem.actorOf(UserActor.props(interfaceActor), UserActor.defaultName)
         userActor
     }
