@@ -23,5 +23,17 @@ object BooleanType extends DataType {
         value == 1
     }
 
-    override def lessThan(a: Any, b: Any): Boolean = a == false
+    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Boolean] < b.asInstanceOf[Boolean]
+
+    override def max(values: Any*): Boolean = {
+        values
+            .map(_.asInstanceOf[Boolean])
+            .exists(identity)
+    }
+
+    override def min(values: Any*): Boolean = {
+        values
+            .map(_.asInstanceOf[Boolean])
+            .forall(identity)
+    }
 }

@@ -24,4 +24,16 @@ case class StringType(length: Int = 255) extends DataType {
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[String] < b.asInstanceOf[String]
+
+    override def max(values: Any*): String = {
+        values
+            .map(_.asInstanceOf[String])
+            .max
+    }
+
+    override def min(values: Any*): String = {
+        values
+            .map(_.asInstanceOf[String])
+            .min
+    }
 }

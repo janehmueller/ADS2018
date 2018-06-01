@@ -22,8 +22,17 @@ trait DataType {
 
     def lessThan(a: Any, b: Any): Boolean
 
-    def max: Any
-    def min: Any
+    def lessThanEq(a: Any, b: Any): Boolean = lessThan(a, b) || eq(a, b)
+
+    def eq(a: Any, b: Any): Boolean = a.getClass == b.getClass && a == b
+
+    def greaterThan(a: Any, b: Any): Boolean = !lessThanEq(a, b)
+
+    def greaterThanEq(a: Any, b: Any): Boolean = !lessThan(a, b)
+
+    def max(values: Any*): Any
+
+    def min(values: Any*): Any
 }
 
 object DataType {

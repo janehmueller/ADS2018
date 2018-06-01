@@ -34,4 +34,16 @@ object IntType extends DataType {
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Int] < b.asInstanceOf[Int]
+
+    override def max(values: Any*): Int = {
+        values
+            .map(_.asInstanceOf[Int])
+            .max
+    }
+
+    override def min(values: Any*): Int = {
+        values
+            .map(_.asInstanceOf[Int])
+            .min
+    }
 }

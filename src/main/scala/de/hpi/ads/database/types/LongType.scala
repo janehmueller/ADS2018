@@ -44,4 +44,16 @@ object LongType extends DataType {
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Long] < b.asInstanceOf[Long]
+
+    override def max(values: Any*): Long = {
+        values
+            .map(_.asInstanceOf[Long])
+            .max
+    }
+
+    override def min(values: Any*): Long = {
+        values
+            .map(_.asInstanceOf[Long])
+            .min
+    }
 }

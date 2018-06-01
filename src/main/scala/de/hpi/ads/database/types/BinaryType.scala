@@ -23,5 +23,19 @@ case class BinaryType(length: Int = 255) extends DataType {
 
     override def fromBytes(data: Array[Byte]): Array[Byte] = data
 
-    //TODO override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Int] < b.asInstanceOf[Int]
+    override def lessThan(a: Any, b: Any): Boolean = true
+
+    override def max(values: Any*): Array[Byte] = {
+        values
+            .headOption
+            .map(_.asInstanceOf[Array[Byte]])
+            .getOrElse(Array())
+    }
+
+    override def min(values: Any*): Array[Byte] = {
+        values
+            .headOption
+            .map(_.asInstanceOf[Array[Byte]])
+            .getOrElse(Array())
+    }
 }

@@ -24,5 +24,23 @@ object DateType extends DataType {
         new Date(LongType.fromBytes(data))
     }
 
-    //TODO override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Date] < b.asInstanceOf[Date]
+    override def lessThan(a: Any, b: Any): Boolean = {
+        a.asInstanceOf[Date].getTime < b.asInstanceOf[Date].getTime
+    }
+
+    override def max(values: Any*): Date = {
+        val maxValue = values
+            .map(_.asInstanceOf[Date])
+            .map(_.getTime)
+            .max
+        new Date(maxValue)
+    }
+
+    override def min(values: Any*): Date = {
+        val minValue = values
+            .map(_.asInstanceOf[Date])
+            .map(_.getTime)
+            .min
+        new Date(minValue)
+    }
 }

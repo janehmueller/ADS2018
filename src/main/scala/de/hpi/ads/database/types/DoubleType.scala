@@ -24,4 +24,16 @@ object DoubleType extends DataType {
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Double] < b.asInstanceOf[Double]
+
+    override def max(values: Any*): Double = {
+        values
+            .map(_.asInstanceOf[Double])
+            .max
+    }
+
+    override def min(values: Any*): Double = {
+        values
+            .map(_.asInstanceOf[Double])
+            .min
+    }
 }
