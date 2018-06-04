@@ -33,4 +33,8 @@ case class StringType(length: Int = 255) extends DataType {
             .map(_.asInstanceOf[String])
             .min
     }
+
+    override def avg(value1: Any, value2: Any): Any = {
+        throw new UnsupportedOperationException("This data type does not support averages.")
+    }
 }

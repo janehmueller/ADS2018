@@ -15,7 +15,7 @@ object IntType extends DataType {
     }
 
     override def fromBytes(data: Array[Byte]): Int = {
-        this.testInputLength(data)
+        //this.testInputLength(data)
         val intData = data.map(0xff & _)
         intData(0) << 24  |
             intData(1) << 16  |
@@ -23,7 +23,12 @@ object IntType extends DataType {
             intData(3) << 0
     }
 
-    override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[Int] < b.asInstanceOf[Int]
+    override def lessThan(a: Any, b: Any): Boolean = {
+        if (a == None || b == None) {
+            return true
+        }
+        a.asInstanceOf[Int] < b.asInstanceOf[Int]
+    }
 
     override def max(values: Any*): Int = {
         values
@@ -36,4 +41,6 @@ object IntType extends DataType {
             .map(_.asInstanceOf[Int])
             .min
     }
+
+    override def avg(value1: Any, value2: Any): Int = (value1.asInstanceOf[Int] + value2.asInstanceOf[Int]) / 2
 }

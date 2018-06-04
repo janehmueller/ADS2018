@@ -46,4 +46,6 @@ object LongType extends DataType {
             .map(_.asInstanceOf[Long])
             .min
     }
+
+    override def avg(value1: Any, value2: Any): Long = (value1.asInstanceOf[Long] + value2.asInstanceOf[Long]) / 2
 }

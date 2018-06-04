@@ -1,6 +1,6 @@
 package de.hpi.ads.database
 
-import java.io.RandomAccessFile
+import java.io.{File, RandomAccessFile}
 import java.nio.file.{Files, Paths}
 
 import de.hpi.ads.database.types.TableSchema
@@ -17,7 +17,6 @@ class Table(fileName: String, schema: TableSchema) {
 
     /**
       * Stores offset for row keys.
-      * TODO: serialize
       */
     val keyPositions: MMap[Any, Long] = MMap.empty
 
@@ -30,7 +29,6 @@ class Table(fileName: String, schema: TableSchema) {
     this.openTableFile()
 
     def openTableFile(): Unit = {
-        // TODO: maybe serialize schema and read it again
         val fileExists = Files.exists(Paths.get(fileName))
         this.tableFile = new RandomAccessFile(fileName, "rw")
         if (fileExists) {
@@ -57,8 +55,12 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def cleanUp(): Unit = {
-        tableFile.close()
+        releaseFile()
         Files.deleteIfExists(Paths.get(fileName))
+    }
+
+    def releaseFile(): Unit = {
+        tableFile.close()
     }
 
     def readFile: Array[Byte] = {
@@ -75,9 +77,18 @@ class Table(fileName: String, schema: TableSchema) {
       */
     def readFileHalves: (Array[Byte], Array[Byte], Any) = {
         val primaryKeyMedian = this.getPrimaryKeyMedian
+        val fileHalves = readFileHalves(primaryKeyMedian)
+        (fileHalves._1, fileHalves._2, primaryKeyMedian)
+    }
+
+    def readFileHalves(primaryKeyMedian: Any): (Array[Byte], Array[Byte]) = {
+        /*
         val splitIndex = this.keyPositions(primaryKeyMedian).toInt
+
+        (binaryData.slice(0, splitIndex), binaryData.slice(splitIndex, binaryData.length))
+        */
         val binaryData = this.readFile
-        (binaryData.slice(0, splitIndex), binaryData.slice(splitIndex, binaryData.length), primaryKeyMedian)
+        (Array[Byte](),Array[Byte]())
     }
 
     /**

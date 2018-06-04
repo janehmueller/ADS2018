@@ -8,6 +8,7 @@ import akka.event.Logging
 import akka.testkit.{ImplicitSender, TestKit}
 import de.hpi.ads.database.operators.EqOperator
 import de.hpi.ads.database.types._
+import de.hpi.ads.remote.actors.TableActor.TableExpectDenseInsertRange
 
 import scala.concurrent.duration.DurationInt
 import de.hpi.ads.remote.messages._
@@ -22,10 +23,58 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
     system.eventStream.setLogLevel(Logging.WarningLevel)
 
     override def afterAll: Unit = {
+        Thread.sleep(10000)
         TestKit.shutdownActorSystem(system)
         Files.deleteIfExists(Paths.get(tableFileName))
     }
+    /*
+    it should "rebalance quickly" in {
 
+        val schema = TableSchema("id:int;title:string(255)")
+        val row = List(1, "Great Movie")
+        val tableActor = system.actorOf(TableActor.props(tableName, schema))
+
+        val t0 = System.nanoTime()
+        tableActor ! TableInsertRowMessage(1, row, testActor)
+        val msgCount = 100000
+        for (i <- 2 to msgCount) {
+            tableActor ! TableInsertRowMessage(i, List(i, "Some Other Movie"), testActor)
+        }
+        val t4 = System.nanoTime()
+        println(s"Elapsed time (Inserting start): ${(t4 - t0)/1000000000.0}s")
+        receiveN(msgCount, 2000.seconds)
+        val t1 = System.nanoTime()
+        println(s"Elapsed time (Inserting): ${(t1 - t0)/1000000000.0}s")
+        tableActor ! "Rebalance"
+        tableActor ! TableInsertRowMessage(1000003, List(1000003, "Some Other Movie"), testActor)
+        receiveN(1, 2000.seconds)
+        val t2 = System.nanoTime()
+        println(s"Elapsed time (Rebalancing): ${(t2 - t1)/1000000000.0}s")
+        tableActor ! ShutdownMessage
+    }*/
+
+    it should "be faster when preparing" in {
+
+        val schema = TableSchema("id:int;title:string(255)")
+        val row = List(1, "Great Movie")
+        val tableActor = system.actorOf(TableActor.props(tableName, schema))
+        val msgCount = 100000
+
+        tableActor ! TableExpectDenseInsertRange(1, msgCount)
+        val t0 = System.nanoTime()
+        tableActor ! TableInsertRowMessage(1, row, testActor)
+
+        for (i <- 2 to msgCount) {
+            tableActor ! TableInsertRowMessage(i, List(i, "Some Other Movie"), testActor)
+        }
+        val t4 = System.nanoTime()
+        println(s"Elapsed time (Inserting start): ${(t4 - t0)/1000000000.0}s")
+        receiveN(msgCount, 2000.seconds)
+        val t1 = System.nanoTime()
+        println(s"Elapsed time (Inserting): ${(t1 - t0)/1000000000.0}s")
+        tableActor ! ShutdownMessage
+    }
+    /*
     it should "return inserted values" in {
         val schema = TableSchema("id:int;title:string(255)")
         val row = List(1, "Great Movie")
@@ -53,7 +102,7 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
         println(s"Elapsed time (Simple read): ${(tE - tS)/1000000000.0}s")
 
         tableActor ! TableSelectWhereMessage(1000001, List("id", "title"), EqOperator("id", 1), testActor)
-        val response = expectMsgType[QueryResultMessage](20.seconds)
+        val response = expectMsgType[QueryResultMessage](40.seconds)
         val t2 = System.nanoTime()
         println(s"Elapsed time (Reading): ${(t2 - tE)/1000000000.0}s")
 
@@ -62,5 +111,5 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
         response.result shouldEqual List(row)
         tableActor ! ShutdownMessage
     }
-
+    */
 }
