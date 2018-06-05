@@ -2,7 +2,7 @@ package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, PoisonPill, Props}
 import de.hpi.ads.database.operators.Operator
-import de.hpi.ads.database.Table
+import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.TableSchema
 import de.hpi.ads.remote.actors.ResultCollectorActor.ExpectResultsMessage
 import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
@@ -43,6 +43,12 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     val children : ListBuffer[ActorRef] = ListBuffer()
     var partitionPoint: Any = None
+
+    var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
+
+    def hasIndex(column: String): Boolean = {
+        nonKeyIndices.keySet(column) || this.schema.keyColumn == column
+    }
 
     def this(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any, initdata: Array[Byte]) = {
         this(tableName, fileName, schema, tableActor, lowerBound, upperBound)
@@ -172,13 +178,29 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     def selectWhere(queryID: Int, projection: List[String], operator: Operator, receiver: ActorRef): Unit = {
         // gather answers either from child actors or from associated data
-        // TODO check if index exists and use it
         if (children.nonEmpty) {
             receiver ! ExpectResultsMessage(queryID, children.length - 1)
             children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
         }
-        val result = this.selectWhere(row => operator(row))
-        // TODO projection * (select *) operator
+        var result: List[Row] = Nil
+        if (this.hasIndex(operator.column)) {
+            var memoryLocations: List[Long] = Nil
+            // Use either key index or non-key index
+            if (operator.column == this.schema.keyColumn) {
+                memoryLocations ++= operator.useKeyIndex(this.keyPositions, schema)
+            } else {
+                memoryLocations ++= operator(this.nonKeyIndices(operator.column), schema)
+            }
+
+            // Only use index with random I/O when we read less than half of this partitions entries
+            if (memoryLocations.length < this.keyPositions.size / 2) {
+                result = memoryLocations.map(this.readRow)
+            } else {
+                result = this.selectWhere(row => operator(row, this.schema))
+            }
+        } else {
+            result = this.selectWhere(row => operator(row, this.schema))
+        }
         val projectedResult = result.map(_.project(projection))
         receiver ! QueryResultMessage(queryID, projectedResult)
     }
@@ -187,18 +209,16 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
-            this.updateWhere(data, row => operator(row))
+            this.updateWhere(data, row => operator(row, this.schema))
             receiver ! QuerySuccessMessage(queryID)
         }
     }
 
     def deleteWhere(queryID: Int, operator: Operator, receiver: ActorRef): Unit = {
-        // TODO: figure out how to delete data from file without breaking reading the file
-        // TODO: maintain a second file with a boolean/byte for each row that indicates if it was deleted or not
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
-            this.deleteWhere(row => operator(row))
+            this.deleteWhere(row => operator(row, this.schema))
             receiver ! QuerySuccessMessage(queryID)
         }
     }
