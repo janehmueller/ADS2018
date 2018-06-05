@@ -6,7 +6,7 @@ import java.nio.file.{Files, Paths}
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.testkit.{ImplicitSender, TestKit}
-import de.hpi.ads.database.operators.EqOperator
+import de.hpi.ads.database.operators.{EqOperator, LessThanOperator}
 import de.hpi.ads.database.types._
 
 import scala.concurrent.duration.DurationInt
@@ -44,22 +44,27 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
         val t1 = System.nanoTime()
         println(s"Elapsed time (Inserting): ${(t1 - t0)/1000000000.0}s")
 
-        val someFile = new File(tableFileName)
-        val fileSize = someFile.length
-        println("File size: " + fileSize)
+        println(s"File size: ${Files.size(Paths.get(tableFileName))}")
         val tS = System.nanoTime()
-        val byteArray = Files.readAllBytes(Paths.get(tableFileName))
+        Files.readAllBytes(Paths.get(tableFileName))
         val tE = System.nanoTime()
         println(s"Elapsed time (Simple read): ${(tE - tS)/1000000000.0}s")
 
         tableActor ! TableSelectWhereMessage(1000001, List("id", "title"), EqOperator("id", 1), testActor)
-        val response = expectMsgType[QueryResultMessage](20.seconds)
+        var response = expectMsgType[QueryResultMessage](20.seconds)
         val t2 = System.nanoTime()
-        println(s"Elapsed time (Reading): ${(t2 - tE)/1000000000.0}s")
-
+        println(s"Elapsed time (Reading EqOperator): ${(t2 - tE)/1000000000.0}s")
         response.queryID shouldBe 1000001
         response.result should have length 1
         response.result shouldEqual List(row)
+
+        tableActor ! TableSelectWhereMessage(1000002, List("id", "title"), LessThanOperator("id", 10), testActor)
+        response = expectMsgType[QueryResultMessage](20.seconds)
+        val t3 = System.nanoTime()
+        println(s"Elapsed time (Reading LessThanOperator): ${(t3 - t2)/1000000000.0}s")
+        response.queryID shouldBe 1000002
+        response.result should have length 9
+
         tableActor ! ShutdownMessage
     }
 
