@@ -34,4 +34,8 @@ object DateType extends DataType {
             .min
         new Date(minValue)
     }
+
+    override def avg(value1: Any, value2: Any): Any = {
+        throw new UnsupportedOperationException("This data type does not support averages.")
+    }
 }

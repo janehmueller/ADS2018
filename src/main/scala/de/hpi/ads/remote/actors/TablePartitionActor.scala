@@ -1,5 +1,7 @@
 package de.hpi.ads.remote.actors
 
+import java.nio.file.{Files, Paths}
+
 import akka.actor.{ActorRef, PoisonPill, Props}
 import de.hpi.ads.database.operators.Operator
 import de.hpi.ads.database.{Row, Table}
@@ -42,6 +44,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     import TableActor._
 
     val children : ListBuffer[ActorRef] = ListBuffer()
+    val maxSize: Int = 10000
     var partitionPoint: Any = None
 
     var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
@@ -82,7 +85,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
                 val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
                 children += rightRangeActor
             } else {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, partitionPoint, upperBound, hierarchy), fileName + "__" + partitionPoint)
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "__" + partitionPoint + ".ads", schema, tableActor, partitionPoint, upperBound, hierarchy), fileName + "__" + partitionPoint)
                 children += rightRangeActor
             }
         }
@@ -90,11 +93,12 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     override def preStart(): Unit = {
         super.preStart()
+        tableActor ! ActorReadyMessage(self)
     }
 
     override def postStop(): Unit = {
         super.postStop()
-        children.foreach(_ ! PoisonPill)
+        this.releaseFile()
     }
 
     def receive: Receive = {
@@ -117,11 +121,17 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         case FillWithDataMessage(data) =>
             fillWithData(data)
 
+        case msg: TableExpectDenseInsertRange => expectDenseInsertRange(msg)
+
+
         /** Handle dropping the table. */
-        case ShutdownMessage =>
+        case ShutdownMessage => {
+            if (children.nonEmpty) {
+                children(0) ! ShutdownMessage
+                children(1) ! ShutdownMessage
+            }
             this.cleanUp()
-            children.foreach(_ ! ShutdownMessage) // TODO: is this needed when we already send a poison pill in postStop?
-            context.stop(this.self)
+        }
 
         /** Default case */
         case default => log.error(s"Received unknown message: $default")
@@ -143,6 +153,9 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             this.insertList(data)
             tableActor ! InsertionDoneMessage(queryID)
             receiver ! QuerySuccessMessage(queryID)
+            if (this.keyPositions.size >= this.maxSize) {
+                this.actorFull()
+            }
         }
     }
 
@@ -182,6 +195,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             receiver ! ExpectResultsMessage(queryID, children.length - 1)
             children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
         }
+        val tS = System.nanoTime()
         var result: List[Row] = Nil
         if (this.hasIndex(operator.column)) {
             var memoryLocations: List[Long] = Nil
@@ -201,7 +215,12 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         } else {
             result = this.selectWhere(row => operator(row, this.schema))
         }
+        val tE = System.nanoTime()
+        println(s"Elapsed time (Simple r1): ${(tE - tS)/1000000000.0}s")
+        val tS2 = System.nanoTime()
         val projectedResult = result.map(_.project(projection))
+        val tE2 = System.nanoTime()
+        println(s"Elapsed time (Simple r2): ${(tE2 - tS2)/1000000000.0}s")
         receiver ! QueryResultMessage(queryID, projectedResult)
     }
 
@@ -223,19 +242,56 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         }
     }
 
-    def splitActor() : Unit = {
+    def actorFull() : Unit = {
         val (half1, half2, keyMedian) = this.readFileHalves
+        splitActor(half1, half2, keyMedian)
+    }
+
+    def splitActor(half1: Array[Byte], half2: Array[Byte], keyMedian: Any) : Unit = {
         tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, keyMedian)
         val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, lowerBound, keyMedian, half1), fileName + '0')
         val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, keyMedian, upperBound, half2), fileName + '1')
         children += leftRangeActor
         children += rightRangeActor
+        this.partitionPoint = keyMedian
         this.cleanUp()
     }
 
     def fillWithData(bytes: Array[Byte]): Unit = {
         rebuildTableFromData(bytes)
-        tableActor ! TablePartitionReadyMessage(fileName, lowerBound, upperBound)
+        tableActor ! TablePartitionReadyMessage(fileName, lowerBound, upperBound, self)
     }
 
+    def expectDenseInsertRange(msg: TableExpectDenseInsertRange): Unit = {
+        if (this.children.nonEmpty) {
+            if (schema.primaryKeyColumn.dataType.lessThan(msg.lowerBound, partitionPoint)) {
+                this.children(0) ! msg
+            }
+            if (schema.primaryKeyColumn.dataType.lessThan(partitionPoint , msg.upperBound)) {
+                this.children(1) ! msg
+            }
+        } else {
+            var min = 0
+            if (lowerBound == None) {
+                min = msg.lowerBound.asInstanceOf[Int]
+            } else {
+                min = schema.primaryKeyColumn.dataType.max(msg.lowerBound, lowerBound).asInstanceOf[Int]
+            }
+            var max = 0
+            if (upperBound == None) {
+                max = msg.upperBound.asInstanceOf[Int]
+            } else {
+                max = schema.primaryKeyColumn.dataType.min(msg.upperBound, upperBound).asInstanceOf[Int]
+            }
+            val additionalRows = max - min //TODO fail for others
+            if (additionalRows + this.keyPositions.size >= this.maxSize) {
+                val median = schema.primaryKeyColumn.dataType.avg(min, max)
+                val (half1, half2) = this.readFileHalves(median)
+                splitActor(half1, half2, median)
+                children(0) ! msg
+                children(1) ! msg
+            } else {
+            }
+        }
+    }
 }

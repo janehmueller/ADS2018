@@ -32,6 +32,8 @@ trait DataType {
     def max(values: Any*): Any
 
     def min(values: Any*): Any
+
+    def avg(value1: Any, value2: Any): Any
 }
 
 object DataType {

@@ -26,4 +26,6 @@ object DoubleType extends DataType {
             .map(_.asInstanceOf[Double])
             .min
     }
+
+    override def avg(value1: Any, value2: Any): Double = (value1.asInstanceOf[Double] + value2.asInstanceOf[Double]) / 2
 }

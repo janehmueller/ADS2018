@@ -26,4 +26,6 @@ object BooleanType extends DataType {
             .map(_.asInstanceOf[Boolean])
             .forall(identity)
     }
+
+    override def avg(value1: Any, value2: Any): Boolean = value1.asInstanceOf[Boolean] || value2.asInstanceOf[Boolean]
 }
