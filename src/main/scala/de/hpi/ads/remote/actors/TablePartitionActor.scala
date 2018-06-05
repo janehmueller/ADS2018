@@ -228,6 +228,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
+            // TODO: use index
             this.updateWhere(data, row => operator(row, this.schema))
             receiver ! QuerySuccessMessage(queryID)
         }
@@ -237,6 +238,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
+            // TODO: use index
             this.deleteWhere(row => operator(row, this.schema))
             receiver ! QuerySuccessMessage(queryID)
         }

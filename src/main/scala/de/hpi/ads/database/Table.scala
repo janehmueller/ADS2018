@@ -1,13 +1,13 @@
 package de.hpi.ads.database
 
-import java.io.{File, RandomAccessFile}
+import java.io.RandomAccessFile
 import java.nio.file.{Files, Paths}
 
 import de.hpi.ads.database.types.TableSchema
 import de.hpi.ads.utils.medianOfMedians
 
 import scala.collection.mutable.{Map => MMap, Set => MSet}
-
+import util.control.Breaks._
 
 class Table(fileName: String, schema: TableSchema) {
     /**
@@ -82,13 +82,29 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def readFileHalves(primaryKeyMedian: Any): (Array[Byte], Array[Byte]) = {
-        /*
-        val splitIndex = this.keyPositions(primaryKeyMedian).toInt
-
-        (binaryData.slice(0, splitIndex), binaryData.slice(splitIndex, binaryData.length))
-        */
         val binaryData = this.readFile
-        (Array[Byte](),Array[Byte]())
+        val rowSize = this.schema.rowSizeWithHeader
+        var leftHalf = Array[Byte]()
+        var rightHalf = Array[Byte]()
+        var i = 0
+        while (i < binaryData.length) {
+            breakable {
+                val rowWithHeader = binaryData.slice(i, i + rowSize)
+                val header = rowWithHeader(0)
+                if (Row.isDeleted(header)) {
+                    break
+                }
+                val binaryRow = rowWithHeader.slice(1, rowWithHeader.length)
+                val rowKey = Row.fromBinary(binaryRow, this.schema).key
+                if (this.schema.primaryKeyColumn.lessThan(rowKey, primaryKeyMedian)) {
+                    leftHalf ++= rowWithHeader
+                } else {
+                    rightHalf ++= rowWithHeader
+                }
+            }
+            i += rowSize
+        }
+        (leftHalf, rightHalf)
     }
 
     /**
