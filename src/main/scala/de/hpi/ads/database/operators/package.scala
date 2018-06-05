@@ -1,22 +1,7 @@
-/*
-Copyright 2016-17, Hasso-Plattner-Institut fuer Softwaresystemtechnik GmbH
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package de.hpi.ads.database
 
-import java.util.Date
+import de.hpi.ads.database.types.{ColumnType, TableSchema}
+import scala.collection.mutable.{Map => MMap}
 
 package object operators {
     trait Operator {
@@ -24,93 +9,99 @@ package object operators {
 
         def value: Any
 
-        def compare(other: Any): Boolean
+        def columnType(schema: TableSchema): ColumnType = schema.columnByName(column)
+
+        var compareFunction: (Any, Any) => Boolean = _
+
+        def setCompareFunction(schema: TableSchema): Unit
+
+        def compare(other: Any): Boolean = {
+            this.compareFunction(other, value)
+        }
 
         def compareAny(other: Any): Boolean = {
             other.getClass == value.getClass && this.compare(other)
         }
 
-        def apply(row: Row): Boolean = this.compareAny(row.getByName(column))
+        def apply(row: Row, schema: TableSchema): Boolean = {
+            this.setCompareFunction(schema)
+            this.compareAny(row.getByName(column))
+        }
 
-        def apply(other: Any): Boolean = this.compareAny(other)
+        def apply(other: Any, schema: TableSchema): Boolean = {
+            this.setCompareFunction(schema)
+            this.compareAny(other)
+        }
 
-        def apply(index: Map[Int, Any]): Map[Int, Any] = {
-            // TODO filter index and return indexed values that return true for the operator
-            throw new NotImplementedError()
+        def apply(index: MMap[Any, List[Long]], schema: TableSchema): List[Long] = {
+            this.setCompareFunction(schema)
+            index
+                .filterKeys(key => this.compareFunction(key, value))
+                .values
+                .flatten
+                .toList
+        }
+
+        def useKeyIndex(index: MMap[Any, Long], schema: TableSchema): List[Long] = {
+            this.setCompareFunction(schema)
+            index
+                .filterKeys(key => this.compareFunction(key, value))
+                .values
+                .toList
         }
     }
 
-    //TODO almost of of these seem very slow, might be worth to refactor so that they just return a comparator of the appropiate data type that is then applied
-
     case class EqOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other == value
-        override def compareAny(other: Any): Boolean = other == value
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).eq
+        }
+
+        override def useKeyIndex(index: MMap[Any, Long], schema: TableSchema): List[Long] = {
+            index.get(value).toList
+        }
+
+        override def apply(index: MMap[Any, List[Long]], schema: TableSchema): List[Long] = {
+            index.getOrElse(value, Nil)
+        }
     }
 
     case class NeqOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other != value
-        override def compareAny(other: Any): Boolean = other != value
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).neq
+        }
     }
 
     case class LessThanOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other match {
-            case x: Boolean => x < value.asInstanceOf[Boolean]
-            case x: Date => x.getTime < value.asInstanceOf[Date].getTime
-            case x: Double => x < value.asInstanceOf[Double]
-            case x: Int => x < value.asInstanceOf[Int]
-            case x: Long => x < value.asInstanceOf[Long]
-            case x: String => x < value.asInstanceOf[String]
-            case _ => false
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).lessThan
         }
     }
 
     case class LessThanEqOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other match {
-            case x: Boolean => x <= value.asInstanceOf[Boolean]
-            case x: Date => x.getTime <= value.asInstanceOf[Date].getTime
-            case x: Double => x <= value.asInstanceOf[Double]
-            case x: Int => x <= value.asInstanceOf[Int]
-            case x: Long => x <= value.asInstanceOf[Long]
-            case x: String => x <= value.asInstanceOf[String]
-            case _ => false
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).lessThanEq
         }
     }
 
     case class GreaterThanOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other match {
-            case x: Boolean => x > value.asInstanceOf[Boolean]
-            case x: Date => x.getTime > value.asInstanceOf[Date].getTime
-            case x: Double => x > value.asInstanceOf[Double]
-            case x: Int => x > value.asInstanceOf[Int]
-            case x: Long => x > value.asInstanceOf[Long]
-            case x: String => x > value.asInstanceOf[String]
-            case _ => false
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).greaterThan
         }
     }
 
     case class GreaterThanEqOperator(column: String, value: Any) extends Operator {
-        override def compare(other: Any): Boolean = other match {
-            case x: Boolean => x >= value.asInstanceOf[Boolean]
-            case x: Date => x.getTime >= value.asInstanceOf[Date].getTime
-            case x: Double => x >= value.asInstanceOf[Double]
-            case x: Int => x >= value.asInstanceOf[Int]
-            case x: Long => x >= value.asInstanceOf[Long]
-            case x: String => x >= value.asInstanceOf[String]
-            case _ => false
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = columnType(schema).greaterThanEq
         }
     }
 
     case class InRangeOperator(column: String, lowerBound: Any, upperBound: Any) extends Operator {
         override def value: Any = None
 
-        override def compare(other: Any): Boolean = other match {
-            case x: Boolean => x <= upperBound.asInstanceOf[Boolean] && x >= lowerBound.asInstanceOf[Boolean]
-            case x: Date => x.getTime <= upperBound.asInstanceOf[Date].getTime && x.getTime >= lowerBound.asInstanceOf[Date].getTime
-            case x: Double => x <= upperBound.asInstanceOf[Double] && x >= lowerBound.asInstanceOf[Double]
-            case x: Int => x <= upperBound.asInstanceOf[Int] && x >= lowerBound.asInstanceOf[Int]
-            case x: Long => x <= upperBound.asInstanceOf[Long] && x >= lowerBound.asInstanceOf[Long]
-            case x: String => x <= upperBound.asInstanceOf[String] && x >= lowerBound.asInstanceOf[String]
-            case _ => false
+        override def setCompareFunction(schema: TableSchema): Unit = {
+            this.compareFunction = (other: Any, value: Any) => {
+                columnType(schema).greaterThanEq(other, lowerBound) && columnType(schema).lessThanEq(other, upperBound)
+            }
         }
     }
 }

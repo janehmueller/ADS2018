@@ -92,7 +92,11 @@ class Row(schema: TableSchema) extends Dynamic {
       * @return values of the selected columns in order of the projection
       */
     def project(projection: List[String]): List[Any] = {
-        projection.map(this.getByName)
+        if (projection.nonEmpty) {
+            projection.map(this.getByName)
+        } else {
+            this.toList
+        }
     }
 }
 

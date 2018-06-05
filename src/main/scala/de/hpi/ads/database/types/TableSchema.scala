@@ -6,17 +6,19 @@ case class TableSchema(columns: IndexedSeq[ColumnType]) {
       */
     val primaryKeyPosition: Int = 0
 
+    val columnNames: IndexedSeq[String] = columns.map(_.name)
+
     def primaryKeyColumn: ColumnType = columns(primaryKeyPosition)
 
     def numValues: Int = columns.length
 
     def keyColumn: String = columns(primaryKeyPosition).name
 
-    def columnNames: IndexedSeq[String] = columns.map(_.name)
-
     def columnPosition(columnName: String): Int = columnNames.indexOf(columnName)
 
     def columnPositions(columnNames: List[String]): List[Int] = columnNames.map(columnPosition)
+
+    def columnByName(columnName: String): ColumnType = columns(columnPosition(columnName))
 
     def rowSize: Int = columns.map(_.size).sum
 

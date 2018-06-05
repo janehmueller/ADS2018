@@ -23,6 +23,8 @@ trait DataType {
 
     def eq(a: Any, b: Any): Boolean = a.getClass == b.getClass && a == b
 
+    def neq(a: Any, b: Any): Boolean = !eq(a, b)
+
     def greaterThan(a: Any, b: Any): Boolean = !lessThanEq(a, b)
 
     def greaterThanEq(a: Any, b: Any): Boolean = !lessThan(a, b)
