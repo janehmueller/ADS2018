@@ -1,5 +1,7 @@
 package de.hpi.ads.database.types
 
+import scala.collection.mutable.{Map => MMap}
+
 case class TableSchema(columns: IndexedSeq[ColumnType]) {
     /**
       * Position of primary key.
@@ -7,6 +9,8 @@ case class TableSchema(columns: IndexedSeq[ColumnType]) {
     val primaryKeyPosition: Int = 0
 
     val columnNames: IndexedSeq[String] = columns.map(_.name)
+
+    val columnOffsets: Map[String, Int] = this.calculateColumnOffsets
 
     def primaryKeyColumn: ColumnType = columns(primaryKeyPosition)
 
@@ -25,6 +29,21 @@ case class TableSchema(columns: IndexedSeq[ColumnType]) {
     def rowSizeWithHeader: Int = this.rowSize + 1
 
     def columnsWithIndex: IndexedSeq[(ColumnType, Int)] = this.columns.zipWithIndex
+
+    def numColumns: Int = this.columns.length
+
+    def calculateColumnOffsets: Map[String, Int] = {
+        var index = 0
+        var offset = 0
+        val offsets = MMap.empty[String, Int]
+        while (index < this.columns.length) {
+            val column = this.columns(index)
+            offsets(column.name) = offset
+            offset += column.size
+            index += 1
+        }
+        offsets.toMap
+    }
 }
 
 object TableSchema {

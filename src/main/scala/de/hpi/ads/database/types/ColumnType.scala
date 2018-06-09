@@ -1,7 +1,13 @@
 package de.hpi.ads.database.types
 
 case class ColumnType(name: String, dataType: DataType) {
-    def toBytes(data: Any): Array[Byte] = dataType.toBytes(data)
+    def toBytes(data: Any): Array[Byte] = {
+        if (data == null) {
+            new Array[Byte](dataType.byteSize)
+        } else {
+            dataType.toBytes(data)
+        }
+    }
 
     def fromBytes(data: Array[Byte]): Any = dataType.fromBytes(data)
 

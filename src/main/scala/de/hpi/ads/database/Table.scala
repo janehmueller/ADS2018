@@ -46,11 +46,11 @@ class Table(fileName: String, schema: TableSchema) {
             .zipWithIndex
             .flatMap { case (binaryRow, index) =>
                 val header = binaryRow(0)
-                val row = Row.fromBinary(binaryRow.slice(1, rowSize), this.schema)
-                if (Row.isDeleted(header)) None else Option((row, index))
-            }.foreach { case (row, index) =>
+                val key = Row.read(binaryRow.slice(1, rowSize), schema.keyColumn, this.schema)
+                if (Row.isDeleted(header)) None else Option((key, index))
+            }.foreach { case (key, index) =>
                 val offset = rowSize * index
-                this.keyPositions(row.key) = offset
+                this.keyPositions(key) = offset
             }
     }
 
@@ -95,7 +95,7 @@ class Table(fileName: String, schema: TableSchema) {
                     break
                 }
                 val binaryRow = rowWithHeader.slice(1, rowWithHeader.length)
-                val rowKey = Row.fromBinary(binaryRow, this.schema).key
+                val rowKey = Row.read(binaryRow, this.schema.keyColumn, this.schema)
                 if (this.schema.primaryKeyColumn.lessThan(rowKey, primaryKeyMedian)) {
                     leftHalf ++= rowWithHeader
                 } else {
@@ -140,7 +140,7 @@ class Table(fileName: String, schema: TableSchema) {
       * @param key the key of the row
       * @return the row if its found or None if the row key is not present
       */
-    def select(key: Any): Option[Row] = {
+    def select(key: Any): Option[Array[Byte]] = {
         // if the key is not in keyPositions it does not exist
         this.keyPositions
             .get(key)
@@ -152,7 +152,7 @@ class Table(fileName: String, schema: TableSchema) {
       * @param query the query that decides which rows are returned
       * @return the rows for which the query evaluates as true
       */
-    def selectWhere(query: Row => Boolean): List[Row] = {
+    def selectWhere(query: Array[Byte] => Boolean): List[Array[Byte]] = {
         this.readRows(query)
     }
 
@@ -161,26 +161,26 @@ class Table(fileName: String, schema: TableSchema) {
       * @param offset byte offset in the file
       * @return the read row
       */
-    def readRow(offset: Long): Row = {
+    def readRow(offset: Long): Array[Byte] = {
         tableFile.seek(offset)
         val header = tableFile.readByte()
-        val binaryRow = new Array[Byte](this.schema.rowSize)
-        tableFile.readFully(binaryRow)
-        Row.fromBinary(binaryRow, schema)
+        val row = new Array[Byte](this.schema.rowSize)
+        tableFile.readFully(row)
+        row
     }
 
     /**
       * Reads a row starting at the current file pointer position.
       * @return the read row
       */
-    def readNextRow: Row = {
+    def readNextRow: Array[Byte] = {
         val header = tableFile.readByte()
-        val binaryRow = new Array[Byte](this.schema.rowSize)
-        tableFile.readFully(binaryRow)
-        Row.fromBinary(binaryRow, schema)
+        val row = new Array[Byte](this.schema.rowSize)
+        tableFile.readFully(row)
+        row
     }
 
-    def readRows(query: Row => Boolean = _ => true): List[Row] = {
+    def readRows(query: Array[Byte] => Boolean = _ => true): List[Array[Byte]] = {
         val binaryData = this.readFile
         val rowSize = this.schema.rowSizeWithHeader
         assert(binaryData.length % rowSize == 0)
@@ -188,7 +188,7 @@ class Table(fileName: String, schema: TableSchema) {
             .grouped(rowSize)
             .flatMap { binaryRow =>
                 val header = binaryRow(0)
-                val row = Row.fromBinary(binaryRow.slice(1, rowSize), this.schema)
+                val row = binaryRow.slice(1, rowSize)
                 if (Row.isDeleted(header)) None else Option(row)
             }.filter(query)
             .toList
@@ -200,7 +200,7 @@ class Table(fileName: String, schema: TableSchema) {
       */
     def insert(data: List[(String, Any)]): Unit = {
         assert(data.exists(_._1 == schema.keyColumn), "A new entry must contain the primary key.")
-        val row = Row.fromTuples(data, schema)
+        val row = Row.toBytes(data, schema)
         insertRow(row)
     }
 
@@ -211,19 +211,19 @@ class Table(fileName: String, schema: TableSchema) {
       */
     def insertList(data: List[Any]): Unit = {
         assert(data.length > schema.primaryKeyPosition, "A new entry must contain the primary key.")
-        val row = Row.fromList(data, schema)
+        val row = Row.toBytes(data.toIndexedSeq, schema)
         insertRow(row)
     }
 
     /**
       * Inserts a new entry into the table. The passed key should not already exist in the table.
-      * @param row row object of the inserted data
+      * @param row binary row of the inserted data
       */
-    def insertRow(row: Row): Unit = {
-        assert(!keyPositions.contains(row.key), "A new entry must contain primary key that does not already exist.")
-        val byteData = row.toBytes
-        val offset = insertBinaryRow(byteData)
-        keyPositions(row.key) = offset
+    def insertRow(row: Array[Byte]): Unit = {
+        val key = Row.key(row, this.schema)
+        assert(!keyPositions.contains(key), "A new entry must contain primary key that does not already exist.")
+        val offset = insertBinaryRow(row)
+        keyPositions(key) = offset
     }
 
     /**
@@ -237,7 +237,7 @@ class Table(fileName: String, schema: TableSchema) {
             return
         }
         val updatedRow = row.get
-        data.foreach((updatedRow.putByName _).tupled)
+        data.foreach { case (column, value) => Row.write(updatedRow, column, value, this.schema) }
         this.updateRow(updatedRow)
     }
 
@@ -246,21 +246,21 @@ class Table(fileName: String, schema: TableSchema) {
       * @param data list of attribute names and and their values that will be updated
       * @param query the query deciding which rows will be updated
       */
-    def updateWhere(data: List[(String, Any)], query: Row => Boolean): Unit = {
+    def updateWhere(data: List[(String, Any)], query: Array[Byte] => Boolean): Unit = {
         val updatedRows = this
             .selectWhere(query)
             .map { row =>
-                data.foreach((row.putByName _).tupled)
+                data.foreach { case (column, value) => Row.write(row, column, value, this.schema) }
                 row
             }
         updatedRows.foreach(this.updateRow)
     }
 
-    def updateRow(row: Row): Unit = {
-        assert(keyPositions.contains(row.key), "An updated entry must contain an existing primary key.")
-        val byteData = row.toBytes
-        val offset = this.keyPositions(row.key)
-        this.overwriteBinaryRow(byteData, offset)
+    def updateRow(row: Array[Byte]): Unit = {
+        val key = Row.key(row, this.schema)
+        assert(keyPositions.contains(key), "An updated entry must contain an existing primary key.")
+        val offset = this.keyPositions(key)
+        this.overwriteBinaryRow(row, offset)
     }
 
     /**
@@ -277,8 +277,8 @@ class Table(fileName: String, schema: TableSchema) {
       * Deletes entry of the primary key.
       * @param query the query deciding which rows will be deleted
       */
-    def deleteWhere(query: Row => Boolean): Unit = {
-        this.selectWhere(query).foreach(row => this.delete(row.key))
+    def deleteWhere(query: Array[Byte] => Boolean): Unit = {
+        this.selectWhere(query).foreach(row => this.delete(Row.key(row, this.schema)))
     }
 
     def getPrimaryKeyMedian: Any = {

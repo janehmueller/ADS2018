@@ -23,9 +23,9 @@ package object operators {
             other.getClass == value.getClass && this.compare(other)
         }
 
-        def apply(row: Row, schema: TableSchema): Boolean = {
+        def apply(row: Array[Byte], schema: TableSchema): Boolean = {
             this.setCompareFunction(schema)
-            this.compareAny(row.getByName(column))
+            this.compareAny(Row.read(row, this.column, schema))
         }
 
         def apply(other: Any, schema: TableSchema): Boolean = {

@@ -7,7 +7,7 @@ case class StringType(length: Int = 255) extends DataType {
 
     // TODO prepend length
     override def toBytes(data: Any): Array[Byte] = {
-        val binaryData = data.asInstanceOf[String].getBytes()
+        val binaryData = data.asInstanceOf[String].getBytes(StringType.encoding)
         Arrays.copyOf(binaryData, this.byteSize)
     }
 
@@ -17,7 +17,7 @@ case class StringType(length: Int = 255) extends DataType {
         while (i >= 0 && data(i) == 0) {
             i -= 1
         }
-        new String(data.slice(0, i + 1))
+        new String(data.slice(0, i + 1), StringType.encoding)
     }
 
     override def lessThan(a: Any, b: Any): Boolean = a.asInstanceOf[String] < b.asInstanceOf[String]
@@ -37,4 +37,8 @@ case class StringType(length: Int = 255) extends DataType {
     override def avg(value1: Any, value2: Any): Any = {
         throw new UnsupportedOperationException("This data type does not support averages.")
     }
+}
+
+object StringType {
+    val encoding: String = "UTF-8"
 }
