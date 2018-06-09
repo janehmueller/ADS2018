@@ -18,7 +18,7 @@ class ResultCollectorActor(queryID: Int, queryReceiver: ActorRef) extends ADSAct
 
     var remainingResults: Int = 1
 
-    var partialResult: List[List[Any]] = Nil
+    var partialResult: List[IndexedSeq[Any]] = Nil
 
     def receive: Receive = {
         /** Update the expected number of results for the query. */
@@ -38,7 +38,7 @@ class ResultCollectorActor(queryID: Int, queryReceiver: ActorRef) extends ADSAct
         case default => log.error(s"Received unknown message: $default")
     }
 
-    def queryResult(queryID: Int, rows: List[List[Any]]): Unit = {
+    def queryResult(queryID: Int, rows: List[IndexedSeq[Any]]): Unit = {
         this.addPartialResult(rows)
         if (this.isFinished) {
             this.queryReceiver ! QueryResultMessage(queryID, this.partialResult)
@@ -46,7 +46,7 @@ class ResultCollectorActor(queryID: Int, queryReceiver: ActorRef) extends ADSAct
         }
     }
 
-    def addPartialResult(resultRows: List[List[Any]]): Unit = {
+    def addPartialResult(resultRows: List[IndexedSeq[Any]]): Unit = {
         this.partialResult ++= resultRows
         this.remainingResults -= 1
     }

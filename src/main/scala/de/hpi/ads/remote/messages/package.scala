@@ -22,7 +22,7 @@ import de.hpi.ads.database.operators.Operator
 package object messages {
     /** Query status messages */
     case class QueryFailureMessage(queryID: Int, message: String)
-    case class QueryResultMessage(queryID: Int, result: List[List[Any]])
+    case class QueryResultMessage(queryID: Int, result: List[IndexedSeq[Any]])
     case class QuerySuccessMessage(queryID: Int)
 
     /** Actor state messages */

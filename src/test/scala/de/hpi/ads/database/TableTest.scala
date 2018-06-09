@@ -18,8 +18,8 @@ class TableTest extends FlatSpec with Matchers {
         val table = Table(tableFileFullPath, schema)
         table.insertList(row1)
         table.insertList(row2)
-        val readRow1 = table.select(1).map(_.toList)
-        val readRow2 = table.select(2).map(_.toList)
+        val readRow1 = table.select(1).map(Row.fromBytes(_, schema))
+        val readRow2 = table.select(2).map(Row.fromBytes(_, schema))
         table.cleanUp()
         readRow1 should contain (row1)
         readRow2 should contain (row2)
@@ -51,14 +51,14 @@ class TableTest extends FlatSpec with Matchers {
         val leftRows = leftHalf
             .grouped(schema.rowSizeWithHeader)
             .map(row => row.slice(1, row.length))
-            .map(Row.fromBinary(_, schema).toList)
+            .map(Row.fromBytes(_, schema))
             .toList
         leftRows shouldEqual rows.slice(0, 5)
 
         val rightRows = rightHalf
             .grouped(schema.rowSizeWithHeader)
             .map(row => row.slice(1, row.length))
-            .map(Row.fromBinary(_, schema).toList)
+            .map(Row.fromBytes(_, schema))
             .toList
         rightRows shouldEqual rows.slice(5, rows.length)
     }
@@ -90,14 +90,14 @@ class TableTest extends FlatSpec with Matchers {
         val leftRows = leftHalf
             .grouped(schema.rowSizeWithHeader)
             .map(row => row.slice(1, row.length))
-            .map(Row.fromBinary(_, schema).toList)
+            .map(Row.fromBytes(_, schema))
             .toList
         leftRows shouldEqual rows.slice(0, 3)
 
         val rightRows = rightHalf
             .grouped(schema.rowSizeWithHeader)
             .map(row => row.slice(1, row.length))
-            .map(Row.fromBinary(_, schema).toList)
+            .map(Row.fromBytes(_, schema))
             .toList
         rightRows shouldEqual rows.slice(3, rows.length - 1)
     }

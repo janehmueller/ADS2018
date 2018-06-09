@@ -196,7 +196,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
         }
         val tS = System.nanoTime()
-        var result: List[Row] = Nil
+        var result: List[Array[Byte]] = Nil
         if (this.hasIndex(operator.column)) {
             var memoryLocations: List[Long] = Nil
             // Use either key index or non-key index
@@ -218,7 +218,9 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         val tE = System.nanoTime()
         println(s"Elapsed time (Simple r1): ${(tE - tS)/1000000000.0}s")
         val tS2 = System.nanoTime()
-        val projectedResult = result.map(_.project(projection))
+        val projectedResult = result
+            .map(Row.fromBytes(_, this.schema))
+            .map(Row.project(_, projection.toIndexedSeq, schema))
         val tE2 = System.nanoTime()
         println(s"Elapsed time (Simple r2): ${(tE2 - tS2)/1000000000.0}s")
         receiver ! QueryResultMessage(queryID, projectedResult)
