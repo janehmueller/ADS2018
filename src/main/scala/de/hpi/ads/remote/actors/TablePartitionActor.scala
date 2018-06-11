@@ -194,6 +194,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             receiver ! ExpectResultsMessage(queryID, children.length - 1)
             children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
+            return
         }
         val tS = System.nanoTime()
         var result: List[Array[Byte]] = Nil
