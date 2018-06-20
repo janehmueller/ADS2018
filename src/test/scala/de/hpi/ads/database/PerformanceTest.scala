@@ -25,7 +25,7 @@ class PerformanceTest extends FlatSpec with Matchers {
         println(s"Elapsed time (Inserting): ${(tInsertEnd - tInsertStart)/1000000000.0}s")
 
         println(s"File size: ${Files.size(Paths.get(tableFileFullPath))}")
-        println(s"Table size: ${table.length}")
+        println(s"Table size: ${table.tableFile.length()}")
         val tFileStart = System.nanoTime()
         Files.readAllBytes(Paths.get(tableFileFullPath))
         val tFileEnd = System.nanoTime()

@@ -18,9 +18,9 @@ class Table(fileName: String, schema: TableSchema) {
       */
     var tableFile: RandomAccessFile = _
 
-    var memoryMappedTable: MappedByteBuffer = _
-
-    var length: Int = 0
+//    var memoryMappedTable: MappedByteBuffer = _
+//
+//    var length: Int = 0
 
     /**
       * Stores offset for row keys.
@@ -44,7 +44,7 @@ class Table(fileName: String, schema: TableSchema) {
     def openTableFile(): Unit = {
         val fileExists = Files.exists(Paths.get(fileName))
         this.tableFile = new RandomAccessFile(fileName, "rw")
-        this.memoryMappedTable = this.tableFile.getChannel.map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 1024 * 1024)
+//        this.memoryMappedTable = this.tableFile.getChannel.map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 1024 * 1024)
         if (fileExists) {
             this.rebuildIndex()
         }
@@ -78,15 +78,15 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def readFile: Array[Byte] = {
-//        assert(tableFile.length <= Integer.MAX_VALUE)
-//        val data = new Array[Byte](tableFile.length.toInt)
-//        tableFile.seek(0)
-//        tableFile.readFully(data)
-//        data
-        this.memoryMappedTable.position(0)
-        val data = new Array[Byte](this.length)
-        this.memoryMappedTable.get(data)
+        assert(tableFile.length <= Integer.MAX_VALUE)
+        val data = new Array[Byte](tableFile.length.toInt)
+        tableFile.seek(0)
+        tableFile.readFully(data)
         data
+//        this.memoryMappedTable.position(0)
+//        val data = new Array[Byte](this.length)
+//        this.memoryMappedTable.get(data)
+//        data
     }
 
     /**
@@ -131,40 +131,40 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the memory offset of the appended row in the table
       */
     def insertBinaryRow(row: Array[Byte]): Long = {
-//        val memoryPosition = this.freeMemory.headOption.getOrElse(tableFile.length)
-        val memoryPosition = this.freeMemory.headOption.getOrElse(this.length.toLong)
+        val memoryPosition = this.freeMemory.headOption.getOrElse(tableFile.length)
+//        val memoryPosition = this.freeMemory.headOption.getOrElse(this.length.toLong)
         this.overwriteBinaryRow(row, memoryPosition)
         memoryPosition
     }
 
     def overwriteBinaryRow(row: Array[Byte], offset: Long): Unit = {
-        this.memoryMappedTable.position(offset.toInt)
-        this.memoryMappedTable.put(Row.header())
-        this.memoryMappedTable.put(row)
-        if (offset.toInt == this.length) {
-            this.length += row.length + 1
-        }
+//        this.memoryMappedTable.position(offset.toInt)
+//        this.memoryMappedTable.put(Row.header())
+//        this.memoryMappedTable.put(row)
+//        if (offset.toInt == this.length) {
+//            this.length += row.length + 1
+//        }
 //        this.memoryMappedTable.force()
-//        tableFile.seek(offset)
-//        tableFile.writeByte(Row.header())
-//        tableFile.write(row)
+        tableFile.seek(offset)
+        tableFile.writeByte(Row.header())
+        tableFile.write(row)
     }
 
     def deleteBinaryRow(offset: Long): Unit = {
-        this.memoryMappedTable.position(offset.toInt)
-        this.memoryMappedTable.put(Row.header(deleted = true))
+//        this.memoryMappedTable.position(offset.toInt)
+//        this.memoryMappedTable.put(Row.header(deleted = true))
 //        this.memoryMappedTable.force()
-//        tableFile.seek(offset)
-//        tableFile.writeByte(Row.header(deleted = true))
+        tableFile.seek(offset)
+        tableFile.writeByte(Row.header(deleted = true))
     }
 
     def rebuildTableFromData(data: Array[Byte]): Unit = {
-//        assert(tableFile.length() == 0)
-        this.memoryMappedTable.position(0)
-        this.memoryMappedTable.put(data)
-        this.length = data.length
+//        this.memoryMappedTable.position(0)
+//        this.memoryMappedTable.put(data)
+//        this.length = data.length
 //        this.memoryMappedTable.force()
-//        tableFile.write(data)
+        assert(tableFile.length() == 0)
+        tableFile.write(data)
         rebuildIndex()
     }
 
@@ -214,16 +214,16 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the read row
       */
     def readRow(offset: Long): Array[Byte] = {
-        this.memoryMappedTable.position(offset.toInt)
-        val header = this.memoryMappedTable.get()
-        val row = new Array[Byte](this.schema.rowSize)
-        this.memoryMappedTable.get(row)
-        row
-//        tableFile.seek(offset)
-//        val header = tableFile.readByte()
+//        this.memoryMappedTable.position(offset.toInt)
+//        val header = this.memoryMappedTable.get()
 //        val row = new Array[Byte](this.schema.rowSize)
-//        tableFile.readFully(row)
+//        this.memoryMappedTable.get(row)
 //        row
+        tableFile.seek(offset)
+        val header = tableFile.readByte()
+        val row = new Array[Byte](this.schema.rowSize)
+        tableFile.readFully(row)
+        row
     }
 
     /**
@@ -231,14 +231,14 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the read row
       */
     def readNextRow: Array[Byte] = {
-        val header = this.memoryMappedTable.get()
-        val row = new Array[Byte](this.schema.rowSize)
-        this.memoryMappedTable.get(row)
-        row
-//        val header = tableFile.readByte()
+//        val header = this.memoryMappedTable.get()
 //        val row = new Array[Byte](this.schema.rowSize)
-//        tableFile.readFully(row)
+//        this.memoryMappedTable.get(row)
 //        row
+        val header = tableFile.readByte()
+        val row = new Array[Byte](this.schema.rowSize)
+        tableFile.readFully(row)
+        row
     }
 
     def readRows(query: Array[Byte] => Boolean = _ => true): List[Array[Byte]] = {
