@@ -90,7 +90,7 @@ object Row {
       * @return values of the selected columns in order of the projection
       */
     def project(row: IndexedSeq[Any], projection: IndexedSeq[String], schema: TableSchema): IndexedSeq[Any] = {
-        if (projection.nonEmpty) {
+        if (projection.isEmpty) {
             row
         } else {
             projection

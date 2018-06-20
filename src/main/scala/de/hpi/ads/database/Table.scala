@@ -1,8 +1,11 @@
 package de.hpi.ads.database
 
 import java.io.RandomAccessFile
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.nio.file.{Files, Paths}
 
+import de.hpi.ads.database.operators.Operator
 import de.hpi.ads.database.types.TableSchema
 import de.hpi.ads.utils.medianOfMedians
 
@@ -15,10 +18,20 @@ class Table(fileName: String, schema: TableSchema) {
       */
     var tableFile: RandomAccessFile = _
 
+    var memoryMappedTable: MappedByteBuffer = _
+
+    var length: Int = 0
+
     /**
       * Stores offset for row keys.
       */
     val keyPositions: MMap[Any, Long] = MMap.empty
+
+    var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
+
+    def hasIndex(column: String): Boolean = {
+        nonKeyIndices.keySet(column) || this.schema.keyColumn == column
+    }
 
     /**
       * Contains offsets of unused memory in the table file.
@@ -31,6 +44,7 @@ class Table(fileName: String, schema: TableSchema) {
     def openTableFile(): Unit = {
         val fileExists = Files.exists(Paths.get(fileName))
         this.tableFile = new RandomAccessFile(fileName, "rw")
+        this.memoryMappedTable = this.tableFile.getChannel.map(FileChannel.MapMode.READ_WRITE, 0, 1024 * 1024 * 1024)
         if (fileExists) {
             this.rebuildIndex()
         }
@@ -40,7 +54,7 @@ class Table(fileName: String, schema: TableSchema) {
         this.keyPositions.empty
         val binaryData = this.readFile
         val rowSize = this.schema.rowSizeWithHeader
-        assert(binaryData.length % rowSize == 0)
+        assert(binaryData.length % rowSize == 0, s"Binary data can not be evenly split in $rowSize sized chunks.")
         binaryData
             .grouped(rowSize)
             .zipWithIndex
@@ -64,10 +78,14 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def readFile: Array[Byte] = {
-        assert(tableFile.length <= Integer.MAX_VALUE)
-        val data = new Array[Byte](tableFile.length.toInt)
-        tableFile.seek(0)
-        tableFile.readFully(data)
+//        assert(tableFile.length <= Integer.MAX_VALUE)
+//        val data = new Array[Byte](tableFile.length.toInt)
+//        tableFile.seek(0)
+//        tableFile.readFully(data)
+//        data
+        this.memoryMappedTable.position(0)
+        val data = new Array[Byte](this.length)
+        this.memoryMappedTable.get(data)
         data
     }
 
@@ -113,25 +131,40 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the memory offset of the appended row in the table
       */
     def insertBinaryRow(row: Array[Byte]): Long = {
-        val memoryPosition = this.freeMemory.headOption.getOrElse(tableFile.length)
+//        val memoryPosition = this.freeMemory.headOption.getOrElse(tableFile.length)
+        val memoryPosition = this.freeMemory.headOption.getOrElse(this.length.toLong)
         this.overwriteBinaryRow(row, memoryPosition)
         memoryPosition
     }
 
     def overwriteBinaryRow(row: Array[Byte], offset: Long): Unit = {
-        tableFile.seek(offset)
-        tableFile.writeByte(Row.header())
-        tableFile.write(row)
+        this.memoryMappedTable.position(offset.toInt)
+        this.memoryMappedTable.put(Row.header())
+        this.memoryMappedTable.put(row)
+        if (offset.toInt == this.length) {
+            this.length += row.length + 1
+        }
+//        this.memoryMappedTable.force()
+//        tableFile.seek(offset)
+//        tableFile.writeByte(Row.header())
+//        tableFile.write(row)
     }
 
     def deleteBinaryRow(offset: Long): Unit = {
-        tableFile.seek(offset)
-        tableFile.writeByte(Row.header(deleted = true))
+        this.memoryMappedTable.position(offset.toInt)
+        this.memoryMappedTable.put(Row.header(deleted = true))
+//        this.memoryMappedTable.force()
+//        tableFile.seek(offset)
+//        tableFile.writeByte(Row.header(deleted = true))
     }
 
     def rebuildTableFromData(data: Array[Byte]): Unit = {
-        assert(tableFile.length() == 0)
-        tableFile.write(data)
+//        assert(tableFile.length() == 0)
+        this.memoryMappedTable.position(0)
+        this.memoryMappedTable.put(data)
+        this.length = data.length
+//        this.memoryMappedTable.force()
+//        tableFile.write(data)
         rebuildIndex()
     }
 
@@ -149,11 +182,30 @@ class Table(fileName: String, schema: TableSchema) {
 
     /**
       * Reads the rows for which the given query evaluates as true.
-      * @param query the query that decides which rows are returned
+      * @param operator the operator that decides which rows will be returned
       * @return the rows for which the query evaluates as true
       */
-    def selectWhere(query: Array[Byte] => Boolean): List[Array[Byte]] = {
-        this.readRows(query)
+    def selectWhere(operator: Operator): List[Array[Byte]] = {
+        var result: List[Array[Byte]] = Nil
+        if (this.hasIndex(operator.column)) {
+            var memoryLocations: List[Long] = Nil
+            // Use either key index or non-key index
+            if (operator.column == this.schema.keyColumn) {
+                memoryLocations ++= operator.useKeyIndex(this.keyPositions, schema)
+            } else {
+                memoryLocations ++= operator(this.nonKeyIndices(operator.column), schema)
+            }
+
+            // Only use index with random I/O when we read less than half of this partitions entries
+            if (memoryLocations.length < this.keyPositions.size / 2) {
+                result = memoryLocations.map(this.readRow)
+            } else {
+                result = this.readRows(row => operator(row, this.schema))
+            }
+        } else {
+            result = this.readRows(row => operator(row, this.schema))
+        }
+        result
     }
 
     /**
@@ -162,11 +214,16 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the read row
       */
     def readRow(offset: Long): Array[Byte] = {
-        tableFile.seek(offset)
-        val header = tableFile.readByte()
+        this.memoryMappedTable.position(offset.toInt)
+        val header = this.memoryMappedTable.get()
         val row = new Array[Byte](this.schema.rowSize)
-        tableFile.readFully(row)
+        this.memoryMappedTable.get(row)
         row
+//        tableFile.seek(offset)
+//        val header = tableFile.readByte()
+//        val row = new Array[Byte](this.schema.rowSize)
+//        tableFile.readFully(row)
+//        row
     }
 
     /**
@@ -174,10 +231,14 @@ class Table(fileName: String, schema: TableSchema) {
       * @return the read row
       */
     def readNextRow: Array[Byte] = {
-        val header = tableFile.readByte()
+        val header = this.memoryMappedTable.get()
         val row = new Array[Byte](this.schema.rowSize)
-        tableFile.readFully(row)
+        this.memoryMappedTable.get(row)
         row
+//        val header = tableFile.readByte()
+//        val row = new Array[Byte](this.schema.rowSize)
+//        tableFile.readFully(row)
+//        row
     }
 
     def readRows(query: Array[Byte] => Boolean = _ => true): List[Array[Byte]] = {
@@ -244,11 +305,11 @@ class Table(fileName: String, schema: TableSchema) {
     /**
       * Update a rows for which the query evaluates as true with the passed data.
       * @param data list of attribute names and and their values that will be updated
-      * @param query the query deciding which rows will be updated
+      * @param operator the operator deciding which rows will be updated
       */
-    def updateWhere(data: List[(String, Any)], query: Array[Byte] => Boolean): Unit = {
+    def updateWhere(data: List[(String, Any)], operator: Operator): Unit = {
         val updatedRows = this
-            .selectWhere(query)
+            .selectWhere(operator)
             .map { row =>
                 data.foreach { case (column, value) => Row.write(row, column, value, this.schema) }
                 row
@@ -275,10 +336,10 @@ class Table(fileName: String, schema: TableSchema) {
 
     /**
       * Deletes entry of the primary key.
-      * @param query the query deciding which rows will be deleted
+      * @param operator the query operator which rows will be deleted
       */
-    def deleteWhere(query: Array[Byte] => Boolean): Unit = {
-        this.selectWhere(query).foreach(row => this.delete(Row.key(row, this.schema)))
+    def deleteWhere(operator: Operator): Unit = {
+        this.selectWhere(operator).foreach(row => this.delete(Row.key(row, this.schema)))
     }
 
     def getPrimaryKeyMedian: Any = {

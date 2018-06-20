@@ -47,12 +47,6 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     val maxSize: Int = 10000
     var partitionPoint: Any = None
 
-    var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
-
-    def hasIndex(column: String): Boolean = {
-        nonKeyIndices.keySet(column) || this.schema.keyColumn == column
-    }
-
     def this(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any, initdata: Array[Byte]) = {
         this(tableName, fileName, schema, tableActor, lowerBound, upperBound)
         fillWithData(initdata)
@@ -197,25 +191,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             return
         }
         val tS = System.nanoTime()
-        var result: List[Array[Byte]] = Nil
-        if (this.hasIndex(operator.column)) {
-            var memoryLocations: List[Long] = Nil
-            // Use either key index or non-key index
-            if (operator.column == this.schema.keyColumn) {
-                memoryLocations ++= operator.useKeyIndex(this.keyPositions, schema)
-            } else {
-                memoryLocations ++= operator(this.nonKeyIndices(operator.column), schema)
-            }
-
-            // Only use index with random I/O when we read less than half of this partitions entries
-            if (memoryLocations.length < this.keyPositions.size / 2) {
-                result = memoryLocations.map(this.readRow)
-            } else {
-                result = this.selectWhere(row => operator(row, this.schema))
-            }
-        } else {
-            result = this.selectWhere(row => operator(row, this.schema))
-        }
+        val result = this.selectWhere(operator)
         val tE = System.nanoTime()
         println(s"Elapsed time (Simple r1): ${(tE - tS)/1000000000.0}s")
         val tS2 = System.nanoTime()
@@ -231,8 +207,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
-            // TODO: use index
-            this.updateWhere(data, row => operator(row, this.schema))
+            this.updateWhere(data, operator)
             receiver ! QuerySuccessMessage(queryID)
         }
     }
@@ -241,8 +216,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         if (children.nonEmpty) {
             // TODO: figure out which child actors store the relevant rows
         } else {
-            // TODO: use index
-            this.deleteWhere(row => operator(row, this.schema))
+            this.deleteWhere(operator)
             receiver ! QuerySuccessMessage(queryID)
         }
     }

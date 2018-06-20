@@ -159,8 +159,6 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         //also maybe we actually dont want a HashMap in the first place, if we have time on insertion but not now
         val treeMap = MMap[(Any, Any), (Boolean, Any)]()
         buildTree(sortedSeq, treeMap, 0, sortedSeq.size)
-        println(sortedSeq)
-        println(treeMap)
         // build new topPartitionActor who gets entire tree and builds children recursively
         tablePartitionActor = context.actorOf(
             TablePartitionActor.props(tableName, fileName(tableName), schema, self, None, None, treeMap))
