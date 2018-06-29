@@ -14,9 +14,11 @@ import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Map => MMap}
 
 object TablePartitionActor {
+    def path: String = "./tables"
+
     def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
 
-    def fileName(tableName: String): String = s"table.$tableName.ads"
+    def fileName(tableName: String): String = s"$path/$tableName.table.ads"
 
     def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef): Props = {
         Props(new TablePartitionActor(table, fileName, schema, tableActor, None, None))
@@ -38,7 +40,7 @@ object TablePartitionActor {
 }
 
 class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, lowerBound: Any, upperBound: Any)
-    extends Table(fileName, schema) with ADSActor
+    extends Table(TablePartitionActor.fileName(fileName), schema) with ADSActor
 {
     import TablePartitionActor._
     import TableActor._
@@ -78,14 +80,14 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
                 val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, lowerBound, partitionPoint), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
                 children += leftRangeActor
             } else {
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "_" + partitionPoint + ".ads", schema, tableActor, lowerBound, partitionPoint, hierarchy), fileName + "_" + partitionPoint)
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}_$partitionPoint", schema, tableActor, lowerBound, partitionPoint, hierarchy), s"${fileName}_$partitionPoint")
                 children += leftRangeActor
             }
             if (hierarchy((partitionPoint, upperBound))._1) {
                 val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
                 children += rightRangeActor
             } else {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + "__" + partitionPoint + ".ads", schema, tableActor, partitionPoint, upperBound, hierarchy), fileName + "__" + partitionPoint)
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}__$partitionPoint", schema, tableActor, partitionPoint, upperBound, hierarchy), s"${fileName}__$partitionPoint")
                 children += rightRangeActor
             }
         }
@@ -217,13 +219,13 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             result = this.selectWhere(row => operator(row, this.schema))
         }
         val tE = System.nanoTime()
-        println(s"Elapsed time (Simple r1): ${(tE - tS)/1000000000.0}s")
+        log.info(s"Elapsed time (Simple r1): ${(tE - tS)/1000000000.0}s")
         val tS2 = System.nanoTime()
         val projectedResult = result
             .map(Row.fromBytes(_, this.schema))
             .map(Row.project(_, projection.toIndexedSeq, schema))
         val tE2 = System.nanoTime()
-        println(s"Elapsed time (Simple r2): ${(tE2 - tS2)/1000000000.0}s")
+        log.info(s"Elapsed time (Simple r2): ${(tE2 - tS2)/1000000000.0}s")
         receiver ! QueryResultMessage(queryID, projectedResult)
     }
 

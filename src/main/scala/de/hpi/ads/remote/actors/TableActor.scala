@@ -5,11 +5,10 @@ import de.hpi.ads.database.types.{ColumnType, TableSchema}
 
 import scala.collection.mutable.{Map => MMap}
 import de.hpi.ads.remote.messages._
+import de.hpi.ads.remote.actors.TablePartitionActor.fileName
 
 object TableActor {
     def actorName(tableName: String): String = s"TABLE_${tableName.toUpperCase}"
-
-    def fileName(tableName: String): String = s"$tableName.table.ads"
 
     def props(table: String, schema: String): Props = {
         Props(new TableActor(table, TableSchema(schema)))
@@ -35,7 +34,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
 
     // TODO: partition file names
     var tablePartitionActor: ActorRef = context.actorOf(
-        TablePartitionActor.props(tableName, fileName(tableName), schema, this.self))
+        TablePartitionActor.props(tableName, tableName, schema, this.self))
     var currentInsertions: Int = 0
     var currentPartitionings: Int = 0
     var livingDescendants: Int = 0
@@ -159,11 +158,11 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         //also maybe we actually dont want a HashMap in the first place, if we have time on insertion but not now
         val treeMap = MMap[(Any, Any), (Boolean, Any)]()
         buildTree(sortedSeq, treeMap, 0, sortedSeq.size)
-        println(sortedSeq)
-        println(treeMap)
+        log.info(s"Rebalancing sorted sequence: $sortedSeq")
+        log.info(s"Rebalancing tree map: $treeMap")
         // build new topPartitionActor who gets entire tree and builds children recursively
         tablePartitionActor = context.actorOf(
-            TablePartitionActor.props(tableName, fileName(tableName), schema, self, None, None, treeMap))
+            TablePartitionActor.props(tableName, tableName, schema, self, None, None, treeMap))
         currentlyRebalancing = false
     }
 
