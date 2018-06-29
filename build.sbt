@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
     "org.scalactic" %% "scalactic" % "3.0.5",
-    "org.scalatest" %% "scalatest" % "3.0.5" % Test
+    "org.scalatest" %% "scalatest" % "3.0.5" % Test,
+    "org.apache.commons" % "commons-io" % "1.3.2" % Test
 )
 
 // testing settings
@@ -26,6 +27,8 @@ testOptions in Test := Seq(Tests.Argument(TestFrameworks.ScalaTest, "-oD"))
 javaOptions ++= Seq("-Xms512M", "-Xmx4096M", "-XX:+CMSClassUnloadingEnabled")
 // explicitly enables forking in tests
 fork in Test := true
+// disable parallel execution due to file access in tests
+parallelExecution in Test := false
 
 // disables testing for assembly
 test in assembly := {}

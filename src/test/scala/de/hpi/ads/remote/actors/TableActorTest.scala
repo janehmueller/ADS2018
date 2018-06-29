@@ -1,6 +1,6 @@
 package de.hpi.ads.remote.actors
 
-import java.nio.file.{Files, Paths}
+import java.io.File
 
 import akka.actor.ActorSystem
 import akka.event.Logging
@@ -8,19 +8,23 @@ import akka.testkit.{ImplicitSender, TestKit}
 import de.hpi.ads.database.operators.EqOperator
 import de.hpi.ads.database.types._
 import de.hpi.ads.remote.messages._
+import org.apache.commons.io.FileUtils
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with ImplicitSender
     with FlatSpecLike with Matchers with BeforeAndAfterAll
 {
-    val tableName = "tableActorTest"
-    val tableFileName = s"$tableName.table.ads"
+    var counter: Int = 0
+    def tableName: String = {
+        counter += 1
+        s"tableActorTest_$counter"
+    }
 
     system.eventStream.setLogLevel(Logging.WarningLevel)
 
     override def afterAll: Unit = {
         TestKit.shutdownActorSystem(system)
-        Files.deleteIfExists(Paths.get(tableFileName))
+        FileUtils.cleanDirectory(new File(TablePartitionActor.path))
     }
 
     "Table Actor" should "insert values" in {
