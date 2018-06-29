@@ -40,7 +40,7 @@ class Table(fileName: String, schema: TableSchema) {
         this.keyPositions.empty
         val binaryData = this.readFile
         val rowSize = this.schema.rowSizeWithHeader
-        assert(binaryData.length % rowSize == 0)
+        assert(binaryData.length % rowSize == 0, s"File with size ${binaryData.length} does not contain rows of size $rowSize")
         binaryData
             .grouped(rowSize)
             .zipWithIndex
