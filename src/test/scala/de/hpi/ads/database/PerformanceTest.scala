@@ -15,7 +15,7 @@ class PerformanceTest extends FlatSpec with Matchers {
         val row = List(1, "Great Movie")
         val table = Table(tableFileFullPath, schema)
 
-        val msgCount = 10000000
+        val msgCount = 100000
         val tInsertStart = System.nanoTime()
         table.insertList(row)
         for (i <- 2 to msgCount) {
@@ -37,11 +37,25 @@ class PerformanceTest extends FlatSpec with Matchers {
         result should have length 1
         result shouldEqual List(row)
 
+        val tBulkReadStart = System.nanoTime()
+        for (i <- 1 to msgCount) {
+            result = table.selectWhere(EqOperator("id", i)).map(Row.fromBytes(_, schema))
+            result should have length 1
+        }
+        val tBulkReadEnd = System.nanoTime()
+        println(s"Elapsed time (Reading multiple times): ${(tBulkReadEnd - tBulkReadStart)/1000000000.0}s")
+
+        result = table.selectWhere(EqOperator("title", "Great Movie")).map(Row.fromBytes(_, schema))
+        val tSelectWithoutIndexEnd = System.nanoTime()
+        println(s"Elapsed time (Reading EqOperator w/o index): ${(tSelectWithoutIndexEnd - tBulkReadEnd)/1000000000.0}s")
+        result should have length 1
+        result shouldEqual List(row)
+
         result = table.selectWhere(LessThanOperator("id", 10)).map(Row.fromBytes(_, schema))
         val tSelectMultipleEnd = System.nanoTime()
-        println(s"Elapsed time (Reading LessThanOperator): ${(tSelectMultipleEnd - tSelectEnd)/1000000000.0}s")
+        println(s"Elapsed time (Reading LessThanOperator): ${(tSelectMultipleEnd - tSelectWithoutIndexEnd)/1000000000.0}s")
         result should have length 9
 
-//        table.cleanUp()
+        table.cleanUp()
     }
 }
