@@ -13,7 +13,7 @@ class Table(fileName: String, schema: TableSchema) {
     /**
       * The file to which the table data is saved.
       */
-    var tableFile: RandomAccessFile = _
+    var tableFile: RandomAccessFile = null
 
     /**
       * Stores offset for row keys.
@@ -29,6 +29,7 @@ class Table(fileName: String, schema: TableSchema) {
     this.openTableFile()
 
     def openTableFile(): Unit = {
+        new java.io.File("tables").mkdirs
         val fileExists = Files.exists(Paths.get(fileName))
         this.tableFile = new RandomAccessFile(fileName, "rw")
         if (fileExists) {
