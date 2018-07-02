@@ -3,6 +3,7 @@ package de.hpi.ads.remote.actors
 import java.nio.file.{Files, Paths}
 
 import akka.actor.{ActorRef, PoisonPill, Props}
+import akka.cluster.Cluster
 import de.hpi.ads.database.operators.Operator
 import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.TableSchema
@@ -45,6 +46,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     import TablePartitionActor._
     import TableActor._
 
+    val cluster = Cluster(context.system)
     val children : ListBuffer[ActorRef] = ListBuffer()
     val maxSize: Int = 10000
     var partitionPoint: Any = None

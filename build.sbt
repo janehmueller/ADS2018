@@ -8,6 +8,7 @@ lazy val akkaVersion = "2.5.12"
 
 libraryDependencies ++= Seq(
     "com.typesafe.akka" %% "akka-actor" % akkaVersion,
+    "com.typesafe.akka" %% "akka-cluster" % akkaVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion,
     "com.typesafe.akka" %% "akka-testkit" % akkaVersion % Test,
     "org.scalactic" %% "scalactic" % "3.0.5",

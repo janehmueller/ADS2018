@@ -1,6 +1,8 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, PoisonPill, Props, Terminated}
+import akka.cluster.Cluster
+import akka.cluster.ClusterEvent._
 import de.hpi.ads.database.types.{ColumnType, TableSchema}
 
 import scala.collection.mutable.{Map => MMap}
@@ -41,8 +43,17 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     var currentlyRebalancing: Boolean = false
     var partitionCollection: MMap[(Any, Any), String] = MMap[(Any, Any), String]() + ((None, None) -> fileName(tableName))
 
+    val cluster = Cluster(context.system)
+    var clustersToPartitions = MMap[akka.actor.Address, Int]()
+
     override def postStop(): Unit = {
         super.postStop()
+    }
+
+    override def preStart(): Unit = {
+        super.preStart()
+        cluster.subscribe(self, initialStateMode = InitialStateAsEvents,
+            classOf[MemberEvent], classOf[UnreachableMember])
     }
 
     def receive: Receive = {
@@ -90,6 +101,27 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
             }
         }
         case "Rebalance" => this.startRebalancing()
+
+        //Cluster management
+        case state: CurrentClusterState => {
+            log.info("Wow this is actually a thing!")
+            clustersToPartitions = MMap[akka.actor.Address, Int](state.members.collect {
+                case m if m.status == akka.cluster.MemberStatus.Up => (m.address, 0)
+            }.toMap.toSeq: _*)
+        }
+        case MemberUp(member) ⇒ {
+            log.info("Member is Up: {}", member.address)
+            clustersToPartitions(member) = 1
+        }
+        case UnreachableMember(member) ⇒
+            log.info("Member detected as unreachable: {}", member)
+            //we don't deal with this
+        case MemberRemoved(member, previousStatus) ⇒
+            //we don't deal with this
+            log.info(
+                "Member is Removed: {} after {}",
+                member.address, previousStatus)
+        case _: MemberEvent ⇒ // ignore
 
         /** Handle dropping the table. */
         case ShutdownMessage => {
