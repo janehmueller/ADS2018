@@ -8,7 +8,7 @@ import akka.testkit.{ImplicitSender, TestKit}
 import de.hpi.ads.database.operators.EqOperator
 import de.hpi.ads.database.types._
 import de.hpi.ads.remote.messages._
-import org.apache.commons.io.FileUtils
+//import org.apache.commons.io.FileUtils
 import org.scalatest.{BeforeAndAfterAll, FlatSpecLike, Matchers}
 
 class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with ImplicitSender
@@ -24,7 +24,7 @@ class TableActorTest extends TestKit(ActorSystem("TableActorTest")) with Implici
 
     override def afterAll: Unit = {
         TestKit.shutdownActorSystem(system)
-        FileUtils.cleanDirectory(new File(TablePartitionActor.path))
+        //FileUtils.cleanDirectory(new File(TablePartitionActor.path))
     }
 
     "Table Actor" should "insert values" in {

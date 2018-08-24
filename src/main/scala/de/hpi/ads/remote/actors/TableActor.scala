@@ -111,7 +111,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         }
         case MemberUp(member) ⇒ {
             log.info("Member is Up: {}", member.address)
-            clustersToPartitions(member) = 1
+            //clustersToPartitions(member) = 1
         }
         case UnreachableMember(member) ⇒
             log.info("Member detected as unreachable: {}", member)

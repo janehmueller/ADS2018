@@ -11,7 +11,7 @@ import de.hpi.ads.remote.actors.TableActor.TableExpectDenseInsertRange
 
 import scala.concurrent.duration.DurationInt
 import de.hpi.ads.remote.messages._
-import org.apache.commons.io.FileUtils
+//import org.apache.commons.io.FileUtils
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
 
 class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with ImplicitSender
@@ -27,7 +27,7 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
 
     override def afterAll: Unit = {
         TestKit.shutdownActorSystem(system)
-        FileUtils.cleanDirectory(new File(TablePartitionActor.path))
+        //FileUtils.cleanDirectory(new File(TablePartitionActor.path))
     }
 
     "Table Partition Actor" should "rebalance quickly" in {
