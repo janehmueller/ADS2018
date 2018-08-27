@@ -1,7 +1,7 @@
 package de.hpi.ads.remote.actors
 
 import akka.actor.{ActorRef, PoisonPill, Props, Terminated}
-import akka.cluster.Cluster
+import akka.cluster.{Cluster, MemberStatus}
 import akka.cluster.ClusterEvent._
 import de.hpi.ads.database.types.{ColumnType, TableSchema}
 
@@ -41,10 +41,12 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     var currentPartitionings: Int = 0
     var livingDescendants: Int = 0
     var currentlyRebalancing: Boolean = false
-    var partitionCollection: MMap[(Any, Any), String] = MMap[(Any, Any), String]() + ((None, None) -> fileName(tableName))
+    var partitionCollection: MMap[(Any, Any), (String, akka.actor.Address)] = MMap[(Any, Any), (String, akka.actor.Address)]() + ((None, None) -> (fileName(tableName), self.path.address))
 
     val cluster = Cluster(context.system)
     var clustersToPartitions = MMap[akka.actor.Address, Int]()
+
+    val members = cluster.state.members.filter(_.status == MemberStatus.Up)
 
     override def postStop(): Unit = {
         super.postStop()
@@ -104,10 +106,12 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
 
         //Cluster management
         case state: CurrentClusterState => {
+            /*
             log.info("Wow this is actually a thing!")
             clustersToPartitions = MMap[akka.actor.Address, Int](state.members.collect {
                 case m if m.status == akka.cluster.MemberStatus.Up => (m.address, 0)
             }.toMap.toSeq: _*)
+            */
         }
         case MemberUp(member) ⇒ {
             log.info("Member is Up: {}", member.address)
@@ -137,6 +141,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         case ActorReadyMessage(actorRef) => {
             context.watch(actorRef)
             livingDescendants += 1
+            actorRef.path.address
         }
 
         /** Default case */
@@ -154,7 +159,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
 
     def partitionIsReady(fileName: String, lowerBound: Any, upperBound: Any, actorRef: ActorRef): Unit = {
         currentPartitionings -= 1
-        partitionCollection += ((lowerBound, upperBound) -> fileName)
+        partitionCollection += ((lowerBound, upperBound) -> (fileName, actorRef.path.address))
     }
 
     def descendantDied(actorRef: ActorRef) : Unit = {
@@ -198,7 +203,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         currentlyRebalancing = false
     }
 
-    def buildTree(sortedSeq: Seq[((Any, Any), String)], TreeMap: MMap[(Any, Any), (Boolean, Any)], low: Int, high: Int): Unit = {
+    def buildTree(sortedSeq: Seq[((Any, Any), (String, akka.actor.Address))], TreeMap: MMap[(Any, Any), (Boolean, Any)], low: Int, high: Int): Unit = {
         if (low >= high-1) {
             TreeMap += (sortedSeq(low)._1._1, sortedSeq(low)._1._2) -> (true, sortedSeq(low)._2)
         } else {

@@ -2,8 +2,9 @@ package de.hpi.ads.remote.actors
 
 import java.nio.file.{Files, Paths}
 
-import akka.actor.{ActorRef, PoisonPill, Props}
-import akka.cluster.Cluster
+import akka.actor.{ActorRef, Deploy, PoisonPill, Props}
+import akka.cluster.{Cluster, Member, MemberStatus}
+import akka.remote.RemoteScope
 import de.hpi.ads.database.operators.Operator
 import de.hpi.ads.database.{Row, Table}
 import de.hpi.ads.database.types.TableSchema
@@ -11,8 +12,10 @@ import de.hpi.ads.remote.actors.ResultCollectorActor.ExpectResultsMessage
 import de.hpi.ads.remote.actors.UserActor.TableOpFailureMessage
 import de.hpi.ads.remote.messages._
 
+import scala.collection.SortedSet
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.{Map => MMap}
+import scala.util.Random
 
 object TablePartitionActor {
     def path: String = "./tables"
@@ -50,8 +53,9 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     val children : ListBuffer[ActorRef] = ListBuffer()
     val maxSize: Int = 10000
     var partitionPoint: Any = None
-
+    val members: Seq[Member] = cluster.state.members.filter(_.status == MemberStatus.Up).toSeq
     var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
+    val RNG = new Random()
 
     def hasIndex(column: String): Boolean = {
         nonKeyIndices.keySet(column) || this.schema.keyColumn == column
@@ -77,19 +81,23 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             //nothing to do
         } else {
             //construct child actors
-            partitionPoint = entry._2
+            partitionPoint = entry._2.asInstanceOf[(Any,akka.actor.Address)]._1
             if (hierarchy((lowerBound, partitionPoint))._1) {
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, lowerBound, partitionPoint), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
+                //TODO start at right location
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, lowerBound, partitionPoint).withDeploy(Deploy(scope = RemoteScope(entry._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
                 children += leftRangeActor
             } else {
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}_$partitionPoint", schema, tableActor, lowerBound, partitionPoint, hierarchy), s"${fileName}_$partitionPoint")
+                //TODO start at any location
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}_$partitionPoint", schema, tableActor, lowerBound, partitionPoint, hierarchy).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), s"${fileName}_$partitionPoint")
                 children += leftRangeActor
             }
             if (hierarchy((partitionPoint, upperBound))._1) {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
+                //TODO start at right location
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound).withDeploy(Deploy(scope = RemoteScope(entry._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
                 children += rightRangeActor
             } else {
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}__$partitionPoint", schema, tableActor, partitionPoint, upperBound, hierarchy), s"${fileName}__$partitionPoint")
+                //TODO start at any location
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}__$partitionPoint", schema, tableActor, partitionPoint, upperBound, hierarchy).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), s"${fileName}__$partitionPoint")
                 children += rightRangeActor
             }
         }
@@ -103,6 +111,10 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     override def postStop(): Unit = {
         super.postStop()
         this.releaseFile()
+    }
+
+    def nextMember(): Member = {
+        this.members(RNG.nextInt(this.members.size))
     }
 
     def receive: Receive = {
@@ -257,9 +269,10 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def splitActor(half1: Array[Byte], half2: Array[Byte], keyMedian: Any) : Unit = {
+        log.info("splitting now")
         tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, keyMedian)
-        val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, lowerBound, keyMedian, half1), fileName + '0')
-        val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, keyMedian, upperBound, half2), fileName + '1')
+        val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, lowerBound, keyMedian, half1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), fileName + '0')
+        val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, keyMedian, upperBound, half2).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), fileName + '1')
         children += leftRangeActor
         children += rightRangeActor
         this.partitionPoint = keyMedian

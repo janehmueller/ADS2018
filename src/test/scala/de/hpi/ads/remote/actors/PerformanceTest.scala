@@ -20,7 +20,7 @@ class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with Implic
     var counter: Int = 0
     def tableName: String = {
         counter += 1
-        s"tableActorTest_$counter"
+        s"tablePerformanceTest_$counter"
     }
 
     system.eventStream.setLogLevel(Logging.WarningLevel)

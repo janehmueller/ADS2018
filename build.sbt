@@ -19,11 +19,11 @@ libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.0.5" % Test,
 )
 */
-val `akka-sample-multi-node-scala` = project
+val `actor-database` = project
     .in(file("."))
     .settings(multiJvmSettings: _*)
     .settings(
-        organization := "com.typesafe.akka.samples",
+        organization := "de.hpi.ads",
         scalaVersion := "2.12.6",
         libraryDependencies ++= Seq(
             "com.typesafe.akka" %% "akka-actor" % akkaVersion,
