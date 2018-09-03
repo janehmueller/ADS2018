@@ -21,21 +21,30 @@ import de.hpi.ads.database.operators.Operator
 
 package object messages {
     /** Query status messages */
-    case class QueryFailureMessage(queryID: Int, message: String)
-    case class QueryResultMessage(queryID: Int, result: List[IndexedSeq[Any]])
-    case class QuerySuccessMessage(queryID: Int)
+    @SerialVersionUID(110L)
+    case class QueryFailureMessage(queryID: Int, message: String) extends Serializable
+    @SerialVersionUID(120L)
+    case class QueryResultMessage(queryID: Int, result: List[IndexedSeq[Any]]) extends Serializable
+    @SerialVersionUID(130L)
+    case class QuerySuccessMessage(queryID: Int) extends Serializable
 
     /** Actor state messages */
-    case object ShutdownMessage
+    @SerialVersionUID(140L)
+    case object ShutdownMessage extends Serializable
 
     /** Table messages */
     /** Table Create */
-    case class TableInsertRowMessage(queryID: Int, data: List[Any], receiver: ActorRef)
-    case class TableNamedInsertRowMessage(queryID: Int, data: List[(String, Any)], receiver: ActorRef)
+    @SerialVersionUID(150L)
+    case class TableInsertRowMessage(queryID: Int, data: List[Any], receiver: ActorRef) extends Serializable
+    @SerialVersionUID(160L)
+    case class TableNamedInsertRowMessage(queryID: Int, data: List[(String, Any)], receiver: ActorRef) extends Serializable
     /** Table Read */
-    case class TableSelectWhereMessage(queryID: Int, projection: List[String], operator: Operator, var receiver: ActorRef)
+    @SerialVersionUID(170L)
+    case class TableSelectWhereMessage(queryID: Int, projection: List[String], operator: Operator, var receiver: ActorRef) extends Serializable
     /** Table Update */
-    case class TableUpdateWhereMessage(queryID: Int, data: List[(String, Any)], operator: Operator, receiver: ActorRef)
+    @SerialVersionUID(180L)
+    case class TableUpdateWhereMessage(queryID: Int, data: List[(String, Any)], operator: Operator, receiver: ActorRef) extends Serializable
     /** Table Delete */
-    case class TableDeleteWhereMessage(queryID: Int, operator: Operator, receiver: ActorRef)
+    @SerialVersionUID(190L)
+    case class TableDeleteWhereMessage(queryID: Int, operator: Operator, receiver: ActorRef) extends Serializable
 }

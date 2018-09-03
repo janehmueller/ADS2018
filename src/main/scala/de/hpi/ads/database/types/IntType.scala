@@ -1,6 +1,7 @@
 package de.hpi.ads.database.types
 
-object IntType extends DataType {
+@SerialVersionUID(102L)
+object IntType extends DataType with Serializable {
     override def byteSize = 4
 
     override def toBytes(data: Any): Array[Byte] = {

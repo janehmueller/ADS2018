@@ -2,7 +2,8 @@ package de.hpi.ads.database.types
 
 import java.util.Date
 
-object DateType extends DataType {
+@SerialVersionUID(101L)
+object DateType extends DataType with Serializable {
     override def byteSize = 8
 
     override def toBytes(data: Any): Array[Byte] = {

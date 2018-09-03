@@ -36,7 +36,8 @@ trait DataType {
     def avg(value1: Any, value2: Any): Any
 }
 
-object DataType {
+@SerialVersionUID(100L)
+object DataType extends Serializable {
     def fromString(dataType: String): DataType = {
         dataType.trim match {
             case r"""binary\(([0-9]+)${length}\)""" => BinaryType(length.toInt)

@@ -51,7 +51,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
     val cluster = Cluster(context.system)
     val children : ListBuffer[ActorRef] = ListBuffer()
-    val maxSize: Int = 10000
+    val maxSize: Int = 1000
     var partitionPoint: Any = None
     val members: Seq[Member] = cluster.state.members.filter(_.status == MemberStatus.Up).toSeq
     var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
@@ -264,6 +264,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def actorFull() : Unit = {
+        log.info("actor is full")
         val (half1, half2, keyMedian) = this.readFileHalves
         splitActor(half1, half2, keyMedian)
     }

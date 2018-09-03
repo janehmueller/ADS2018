@@ -1,5 +1,6 @@
 package de.hpi.ads.database.types
 
+@SerialVersionUID(103L)
 object LongType extends DataType {
     override def byteSize = 8
 

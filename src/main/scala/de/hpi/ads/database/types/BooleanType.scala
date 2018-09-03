@@ -1,5 +1,6 @@
 package de.hpi.ads.database.types
 
+@SerialVersionUID(107L)
 object BooleanType extends DataType {
     override def byteSize = 1
 

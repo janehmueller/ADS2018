@@ -2,7 +2,8 @@ package de.hpi.ads.database.types
 
 import java.util.Arrays
 
-case class StringType(length: Int = 255) extends DataType {
+@SerialVersionUID(104L)
+case class StringType(length: Int = 255) extends DataType with Serializable {
     override def byteSize: Int = length * 4
 
     // TODO prepend length

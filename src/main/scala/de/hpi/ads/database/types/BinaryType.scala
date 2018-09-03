@@ -2,6 +2,7 @@ package de.hpi.ads.database.types
 
 import java.util.Arrays
 
+@SerialVersionUID(106L)
 case class BinaryType(length: Int = 255) extends DataType {
     override def byteSize: Int = length
 

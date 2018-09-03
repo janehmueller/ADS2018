@@ -103,7 +103,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
 
                 val t0 = System.nanoTime()
                 tableActor ! TableInsertRowMessage(1, row, testActor)
-                val msgCount = 100000
+                val msgCount = 10000
                 for (i <- 2 to msgCount) {
                     tableActor ! TableInsertRowMessage(i, List(i, "Some Other Movie"), testActor)
                 }
@@ -118,6 +118,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
                 val t2 = System.nanoTime()
                 println(s"Elapsed time (Rebalancing): ${(t2 - t1)/1000000000.0}s")
                 tableActor ! ShutdownMessage
+                Thread.sleep(10000)
             }
 
             enterBarrier("finished")
