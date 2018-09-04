@@ -1,17 +1,15 @@
-//#package
 package sample.multinode
-//#package
 
-//#config
+// config
 import akka.remote.testkit.MultiNodeConfig
 
 object MultiNodeSampleConfig extends MultiNodeConfig {
   val node1 = role("node1")
   val node2 = role("node2")
 }
-//#config
+// config
 
-//#spec
+// spec
 import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.actor.{ Props, Actor }
@@ -59,4 +57,4 @@ class MultiNodeSample extends MultiNodeSpec(MultiNodeSampleConfig)
     }
   }
 }
-//#spec
+// spec
