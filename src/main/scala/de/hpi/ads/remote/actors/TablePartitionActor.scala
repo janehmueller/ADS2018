@@ -81,10 +81,10 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             //nothing to do
         } else {
             //construct child actors
-            partitionPoint = entry._2.asInstanceOf[(Any,akka.actor.Address)]._1
+            partitionPoint = entry._2
             if (hierarchy((lowerBound, partitionPoint))._1) {
                 //TODO start at right location
-                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String], schema, tableActor, lowerBound, partitionPoint).withDeploy(Deploy(scope = RemoteScope(entry._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[String])
+                val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(String,akka.actor.Address)]._1, schema, tableActor, lowerBound, partitionPoint).withDeploy(Deploy(scope = RemoteScope(hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(String,akka.actor.Address)]._1)
                 children += leftRangeActor
             } else {
                 //TODO start at any location
@@ -93,7 +93,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             }
             if (hierarchy((partitionPoint, upperBound))._1) {
                 //TODO start at right location
-                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String], schema, tableActor, partitionPoint, upperBound).withDeploy(Deploy(scope = RemoteScope(entry._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[String])
+                val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[(String,akka.actor.Address)]._1, schema, tableActor, partitionPoint, upperBound).withDeploy(Deploy(scope = RemoteScope(hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[(String,akka.actor.Address)]._1)
                 children += rightRangeActor
             } else {
                 //TODO start at any location
