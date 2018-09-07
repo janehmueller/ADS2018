@@ -15,7 +15,8 @@ import scala.concurrent.duration.DurationInt
 
 object MultiNodePerformanceTestConfig extends MultiNodeConfig {
     commonConfig(ConfigFactory.parseString("akka.cluster.auto-join = off\n" +
-        "akka.actor.provider = cluster"))
+        "akka.actor.provider = cluster\n" +
+        "ads.hierarchyMode = flat"))
     val node1 = role("node1")
     val node2 = role("node2")
 }
@@ -30,11 +31,6 @@ class MultiNodePerformanceTestSpecMultiJvmNode1 extends MultiNodePerformanceTest
 class MultiNodePerformanceTestSpecMultiJvmNode2 extends MultiNodePerformanceTest
 
 object MultiNodePerformanceTest {
-    class Ponger extends Actor {
-        def receive = {
-            case "ping" => sender() ! "pong"
-        }
-    }
 }
 
 class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestConfig)
@@ -103,7 +99,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
 
                 val t0 = System.nanoTime()
                 tableActor ! TableInsertRowMessage(1, row, testActor)
-                val msgCount = 10000
+                val msgCount = 20
                 for (i <- 2 to msgCount) {
                     tableActor ! TableInsertRowMessage(i, List(i, "Some Other Movie"), testActor)
                 }
@@ -118,7 +114,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
                 val t2 = System.nanoTime()
                 println(s"Elapsed time (Rebalancing): ${(t2 - t1)/1000000000.0}s")
                 tableActor ! ShutdownMessage
-                Thread.sleep(10000)
+                Thread.sleep(10)
             }
 
             enterBarrier("finished")

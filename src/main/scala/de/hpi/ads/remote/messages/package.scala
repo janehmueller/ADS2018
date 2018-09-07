@@ -47,4 +47,6 @@ package object messages {
     /** Table Delete */
     @SerialVersionUID(190L)
     case class TableDeleteWhereMessage(queryID: Int, operator: Operator, receiver: ActorRef) extends Serializable
+    @SerialVersionUID(290L)
+    case class PartitionCreatedMessage(ref: ActorRef, bonusInfo: Any)
 }
