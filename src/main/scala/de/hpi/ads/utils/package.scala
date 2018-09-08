@@ -75,4 +75,14 @@ package object utils {
             medianOfMedians(medians, lt)
         }
     }
+
+    def maxOf(arr: Array[Any], lt: (Any, Any) => Boolean): Any = {
+        var curMax = arr(0)
+        for (i <- 1 until arr.length) {
+            if (lt(curMax, arr(i))) {
+                curMax = arr(i)
+            }
+        }
+        curMax
+    }
 }

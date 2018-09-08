@@ -35,14 +35,20 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     import TableActor._
     import SupervisionActor._
 
-    //possible modes: binary, flat, B+
+    //possible modes: binary, flat, Bp
     val hierarchyMode: String = context.system.settings.config.getString("ads.hierarchyMode")
 
     var supervisor: ActorRef = context.actorOf(SupervisionActor.props())
-
+    var firstLevel: Int = 0
+    if (hierarchyMode == "Bp") {
+        firstLevel = 1
+    }
     // TODO: partition file names
     var tablePartitionActor: ActorRef = context.actorOf(
-        TablePartitionActor.props(tableName, tableName, schema, this.self, this.supervisor))
+        TablePartitionActor.props(tableName, tableName, schema, this.self, this.supervisor, firstLevel))
+    if (hierarchyMode == "Bp") {
+        tablePartitionActor ! "setAsTop"
+    }
     var currentInsertions: Int = 0
     var currentPartitionings: Int = 0
     var livingDescendants: Int = 0
@@ -185,7 +191,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     }
 
     def rebalance(): Unit = {
-        if (hierarchyMode == "flat") {
+        if (hierarchyMode != "binary") {
             //is always balanced
             return
         }

@@ -16,7 +16,8 @@ import scala.concurrent.duration.DurationInt
 object MultiNodePerformanceTestConfig extends MultiNodeConfig {
     commonConfig(ConfigFactory.parseString("akka.cluster.auto-join = off\n" +
         "akka.actor.provider = cluster\n" +
-        "ads.hierarchyMode = flat"))
+        "ads.hierarchyMode = Bp\n" +
+        "ads.maxChildren = 5"))
     val node1 = role("node1")
     val node2 = role("node2")
 }
@@ -96,7 +97,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
                 val schema = TableSchema("id:int;title:string(20)")
                 val row = List(1, "Great Movie")
                 val tableActor = system.actorOf(TableActor.props(tableName, schema))
-
+                Thread.sleep(1000)
                 val t0 = System.nanoTime()
                 tableActor ! TableInsertRowMessage(1, row, testActor)
                 val msgCount = 20

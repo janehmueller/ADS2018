@@ -4,7 +4,7 @@ import java.io.RandomAccessFile
 import java.nio.file.{Files, Paths}
 
 import de.hpi.ads.database.types.TableSchema
-import de.hpi.ads.utils.medianOfMedians
+import de.hpi.ads.utils.{maxOf, medianOfMedians}
 
 import scala.collection.mutable.{Map => MMap, Set => MSet}
 import util.control.Breaks._
@@ -285,6 +285,10 @@ class Table(fileName: String, schema: TableSchema) {
     def getPrimaryKeyMedian: Any = {
         val primaryKeyValues = keyPositions.keys.toArray
         medianOfMedians(primaryKeyValues, schema.primaryKeyColumn.dataType.lessThan)
+    }
+
+    def getPrimaryKeyMax: Any = {
+        maxOf(keyPositions.keys.toArray,schema.primaryKeyColumn.dataType.lessThan)
     }
 }
 

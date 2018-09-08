@@ -28,6 +28,10 @@ object TablePartitionActor {
         Props(new TablePartitionActor(table, fileName, schema, tableActor, supervisor, None, None))
     }
 
+    def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, supervisor: ActorRef, level: Int): Props = {
+        Props(new TablePartitionActor(table, fileName, schema, tableActor, supervisor, None, None, level = level))
+    }
+
     def props(table: String, fileName: String, schema: TableSchema, tableActor: ActorRef, supervisor: ActorRef, lowerBound: Any, upperBound: Any): Props = {
         Props(new TablePartitionActor(table, fileName, schema, tableActor, supervisor, lowerBound, upperBound))
     }
@@ -41,9 +45,11 @@ object TablePartitionActor {
     }
 
     case class FillWithDataMessage(data: Array[Byte])
+    case class ChildrenAreFullMessage(maxVal: Any)
+
 }
 
-class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, supervisor: ActorRef, lowerBound: Any, upperBound: Any)
+class TablePartitionActor(tableName: String, fileName: String, schema: TableSchema, tableActor: ActorRef, var supervisor: ActorRef, lowerBound: Any, upperBound: Any, level: Int = -1)
     extends Table(TablePartitionActor.fileName(fileName), schema) with ADSActor
 {
     import TablePartitionActor._
@@ -51,18 +57,27 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     import SupervisionActor._
     import de.hpi.ads.remote.messages._
 
-    //possible modes: binary, flat, B+
+    //possible modes: binary, flat, Bp
     val hierarchyMode: String = context.system.settings.config.getString("ads.hierarchyMode")
-
+    val maxChildren: Int = context.system.settings.config.getInt("ads.maxChildren")
 
     val cluster = Cluster(context.system)
     val children : ListBuffer[ActorRef] = ListBuffer()
     var currentlySplitting : Boolean = false
     val maxSize: Int = 10
     var partitionPoint: Any = None
+    val partitionPoints: ListBuffer[Any] = ListBuffer()
     val members: Seq[Member] = cluster.state.members.filter(_.status == MemberStatus.Up).toSeq
     var nonKeyIndices: MMap[String, MMap[Any, List[Long]]] = MMap.empty
     val RNG = new Random()
+    var isTop = false
+    var isFullMessageSent = false
+    var reportedMax: Any = None
+    log.warning("Starting actor at level " + level.toString)
+    if (level > 0) {
+        val ref = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level - 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
+        children += ref
+    }
 
     def hasIndex(column: String): Boolean = {
         nonKeyIndices.keySet(column) || this.schema.keyColumn == column
@@ -91,20 +106,16 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             //construct child actors
             partitionPoint = entry._2
             if (hierarchy((lowerBound, partitionPoint))._1) {
-                //TODO start at right location
                 val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(String,akka.actor.Address)]._1, schema, tableActor, self, lowerBound, partitionPoint).withDeploy(Deploy(scope = RemoteScope(hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(String,akka.actor.Address)]._1)
                 children += leftRangeActor
             } else {
-                //TODO start at any location
                 val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}_$partitionPoint", schema, tableActor, self, lowerBound, partitionPoint, hierarchy).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), s"${fileName}_$partitionPoint")
                 children += leftRangeActor
             }
             if (hierarchy((partitionPoint, upperBound))._1) {
-                //TODO start at right location
                 val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, hierarchy((partitionPoint, upperBound))._2.asInstanceOf[(String,akka.actor.Address)]._1, schema, tableActor, self, partitionPoint, upperBound).withDeploy(Deploy(scope = RemoteScope(hierarchy((lowerBound, partitionPoint))._2.asInstanceOf[(Any,akka.actor.Address)]._2))), hierarchy((partitionPoint, upperBound))._2.asInstanceOf[(String,akka.actor.Address)]._1)
                 children += rightRangeActor
             } else {
-                //TODO start at any location
                 val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, s"${fileName}__$partitionPoint", schema, tableActor, self, partitionPoint, upperBound, hierarchy).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), s"${fileName}__$partitionPoint")
                 children += rightRangeActor
             }
@@ -203,6 +214,32 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             }
         }
 
+        case "setAsTop" => {
+            this.isTop = true
+        }
+
+        case msg: ChildrenAreFullMessage => {
+            assert(this.hierarchyMode == "Bp")
+            if (this.children.size == maxChildren) {
+                if (!this.isTop) {
+                    //escalate
+                    supervisor ! msg
+                } else {
+                    //start up new top
+                    supervisor = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level + 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
+                    this.isTop = false
+                    supervisor ! "setAsTop"
+                    children += supervisor
+                    partitionPoints += msg.maxVal
+                }
+            } else {
+                this.partitionPoints += msg.maxVal
+                //start new child
+                val ref = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level - 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
+                children += ref
+            }
+        }
+
 
         /** Handle dropping the table. */
         case ShutdownMessage => {
@@ -228,23 +265,63 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             tableActor ! InsertionDoneMessage(queryID)
             return
         }
-        if (children.nonEmpty) {
-            if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition), partitionPoint)) {
-                children(0) ! TableInsertRowMessage(queryID, data, receiver)
+        if (hierarchyMode == "Bp") {
+            if (level <= 0) {
+                if (isFullMessageSent && schema.primaryKeyColumn.dataType.lessThan(reportedMax, data(this.schema.primaryKeyPosition))) {
+                    //return to top
+                    supervisor ! TableInsertRowMessage(queryID, data, receiver)
+                }
+                if (children.nonEmpty) {
+                    if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition), partitionPoint)) {
+                        children(0) ! TableInsertRowMessage(queryID, data, receiver)
+                    } else {
+                        children(1) ! TableInsertRowMessage(queryID, data, receiver)
+                    }
+                } else {
+                    this.insertList(data)
+                    tableActor ! InsertionDoneMessage(queryID)
+                    receiver ! QuerySuccessMessage(queryID)
+                    if (this.keyPositions.size >= this.maxSize) {
+                        this.actorFull()
+                        if (!isFullMessageSent) {
+                            reportedMax = getPrimaryKeyMax
+                            supervisor ! ChildrenAreFullMessage(reportedMax)
+                            isFullMessageSent = true
+                        }
+                    }
+                }
             } else {
-                children(1) ! TableInsertRowMessage(queryID, data, receiver)
+                //level > 0
+                val primKey = data(this.schema.primaryKeyPosition)
+                for (i <- 0 until partitionPoints.length) {
+                    if (schema.primaryKeyColumn.dataType.lessThan(primKey, partitionPoints(i))) {
+                        children(i) ! TableInsertRowMessage(queryID, data, receiver)
+                        return
+                    }
+                }
+                children.last ! TableInsertRowMessage(queryID, data, receiver)
             }
         } else {
-            this.insertList(data)
-            tableActor ! InsertionDoneMessage(queryID)
-            receiver ! QuerySuccessMessage(queryID)
-            if (this.keyPositions.size >= this.maxSize) {
-                this.actorFull()
+            if (children.nonEmpty) {
+                if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition), partitionPoint)) {
+                    children(0) ! TableInsertRowMessage(queryID, data, receiver)
+                } else {
+                    children(1) ! TableInsertRowMessage(queryID, data, receiver)
+                }
+            } else {
+                this.insertList(data)
+                tableActor ! InsertionDoneMessage(queryID)
+                receiver ! QuerySuccessMessage(queryID)
+                if (this.keyPositions.size >= this.maxSize) {
+                    this.actorFull()
+                }
             }
         }
+
     }
 
     def insertRowWithNames(queryID: Int, data: List[(String, Any)], receiver: ActorRef): Unit = {
+        assert(hierarchyMode != "Bp")
         if (!inputContainsValidKey(data)) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
             tableActor ! InsertionDoneMessage(queryID)
@@ -338,7 +415,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def splitActor(half1: Array[Byte], half2: Array[Byte], keyMedian: Any) : Unit = {
-        if (this.hierarchyMode == "binary") {
+        if (this.hierarchyMode == "binary" || this.hierarchyMode == "Bp") {
             tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, keyMedian)
             val leftRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '0', schema, tableActor, self, lowerBound, keyMedian, half1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), fileName + '0')
             val rightRangeActor: ActorRef = context.actorOf(TablePartitionActor.props(tableName, fileName + '1', schema, tableActor, self, keyMedian, upperBound, half2).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))), fileName + '1')
@@ -346,8 +423,6 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
             children += rightRangeActor
             this.partitionPoint = keyMedian
             this.cleanUp()
-        } else if (this.hierarchyMode == "B+") {
-            //TODO
         } else if (this.hierarchyMode == "flat") {
             this.currentlySplitting = true
             tableActor ! TablePartitionStartedMessage(fileName, lowerBound, upperBound, keyMedian)
