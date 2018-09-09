@@ -73,7 +73,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     var isTop = false
     var isFullMessageSent = false
     var reportedMax: Any = None
-    log.warning("Starting actor at level " + level.toString)
+    log.warning("Starting actor at level " + level.toString + " with filename " + fileName)
     if (level > 0) {
         val ref = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level - 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
         children += ref
@@ -142,6 +142,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
 
         /** Table Insert */
         case msg: TableInsertRowMessage => {
+            //log.warning(s"Received message: $msg")
             if (this.currentlySplitting) {
                 self ! msg
             } else {
@@ -185,6 +186,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         }
 
         case msg: FillWithDataMessage => {
+            //log.warning(s"Received message: $msg")
             if (this.currentlySplitting) {
                 self ! msg
             } else {
@@ -215,17 +217,21 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
         }
 
         case "setAsTop" => {
+            //log.warning(s"Received message: setastop")
             this.isTop = true
         }
 
         case msg: ChildrenAreFullMessage => {
             assert(this.hierarchyMode == "Bp")
+            //log.warning(s"Received message: $msg")
             if (this.children.size == maxChildren) {
                 if (!this.isTop) {
                     //escalate
+                    //log.warning("Got children are full, reacting with escalation")
                     supervisor ! msg
                 } else {
                     //start up new top
+                    //log.warning("Got children are full, reacting with starting new top")
                     supervisor = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level + 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
                     this.isTop = false
                     supervisor ! "setAsTop"
@@ -233,9 +239,10 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
                     partitionPoints += msg.maxVal
                 }
             } else {
+                //log.warning("Got children are full, reacting with starting new child")
                 this.partitionPoints += msg.maxVal
                 //start new child
-                val ref = context.actorOf(TablePartitionActor.props(tableName, fileName + 'f', schema, tableActor, self, level - 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
+                val ref = context.actorOf(TablePartitionActor.props(tableName, fileName + (children.size + 1).toString, schema, tableActor, self, level - 1).withDeploy(Deploy(scope = RemoteScope(this.nextMember().address))))
                 children += ref
             }
         }
@@ -259,7 +266,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def insertRow(queryID: Int, data: List[Any], receiver: ActorRef): Unit = {
-        log.warning(s"Inserting row " + queryID.toString)
+        //log.warning(s"Inserting row " + queryID.toString)
         if (!inputContainsValidKey(schema.columnNames.toList.zip(data))) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
             tableActor ! InsertionDoneMessage(queryID)
@@ -270,6 +277,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
                 if (isFullMessageSent && schema.primaryKeyColumn.dataType.lessThan(reportedMax, data(this.schema.primaryKeyPosition))) {
                     //return to top
                     supervisor ! TableInsertRowMessage(queryID, data, receiver)
+                    return
                 }
                 if (children.nonEmpty) {
                     if (schema.primaryKeyColumn.dataType.lessThan(data(this.schema.primaryKeyPosition), partitionPoint)) {

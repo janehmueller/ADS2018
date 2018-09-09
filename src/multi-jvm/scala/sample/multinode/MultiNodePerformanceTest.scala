@@ -9,15 +9,17 @@ import akka.remote.testkit.MultiNodeConfig
 import com.typesafe.config.ConfigFactory
 import de.hpi.ads.database.types.TableSchema
 import de.hpi.ads.remote.actors.TableActor
-import de.hpi.ads.remote.messages.{ShutdownMessage, TableInsertRowMessage}
+import de.hpi.ads.remote.messages._
+import de.hpi.ads.database.operators._
 
 import scala.concurrent.duration.DurationInt
 
 object MultiNodePerformanceTestConfig extends MultiNodeConfig {
     commonConfig(ConfigFactory.parseString("akka.cluster.auto-join = off\n" +
         "akka.actor.provider = cluster\n" +
-        "ads.hierarchyMode = Bp\n" +
-        "ads.maxChildren = 5"))
+        "ads.hierarchyMode = flat\n" +
+        "ads.maxChildren = 5\n" +
+        "akka.actor.warn-about-java-serializer-usage = false"))
     val node1 = role("node1")
     val node2 = role("node2")
 }
@@ -100,7 +102,7 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
                 Thread.sleep(1000)
                 val t0 = System.nanoTime()
                 tableActor ! TableInsertRowMessage(1, row, testActor)
-                val msgCount = 20
+                val msgCount = 21
                 for (i <- 2 to msgCount) {
                     tableActor ! TableInsertRowMessage(i, List(i, "Some Other Movie"), testActor)
                 }
@@ -114,7 +116,16 @@ class MultiNodePerformanceTest extends MultiNodeSpec(MultiNodePerformanceTestCon
                 receiveN(1, 2000.seconds)
                 val t2 = System.nanoTime()
                 println(s"Elapsed time (Rebalancing): ${(t2 - t1)/1000000000.0}s")
-                tableActor ! ShutdownMessage
+
+                var queryId = msgCount + 5
+                tableActor ! TableSelectWhereMessage(queryId, List("id", "title"), EqOperator("id", 1), testActor)
+                var response = expectMsgType[QueryResultMessage]
+                val t3 = System.nanoTime()
+                println(s"Elapsed time (Reading EqOperator): ${(t3 - t2)/1000000000.0}s")
+                response.queryID shouldBe queryId
+                response.result should have length 1
+
+                //tableActor ! ShutdownMessage
                 Thread.sleep(10)
             }
 

@@ -182,7 +182,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     }
 
     def startRebalancing(): Unit = {
-        if (hierarchyMode == "flat") {
+        if (hierarchyMode != "binary") {
             //is always balanced
             return
         }
