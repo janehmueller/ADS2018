@@ -33,10 +33,22 @@ object TableActor {
 
 class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     import TableActor._
+    import SupervisionActor._
 
+    //possible modes: binary, flat, Bp
+    val hierarchyMode: String = context.system.settings.config.getString("ads.hierarchyMode")
+
+    var supervisor: ActorRef = context.actorOf(SupervisionActor.props())
+    var firstLevel: Int = 0
+    if (hierarchyMode == "Bp") {
+        firstLevel = 1
+    }
     // TODO: partition file names
     var tablePartitionActor: ActorRef = context.actorOf(
-        TablePartitionActor.props(tableName, tableName, schema, this.self))
+        TablePartitionActor.props(tableName, tableName, schema, this.self, this.supervisor, firstLevel))
+    if (hierarchyMode == "Bp") {
+        tablePartitionActor ! "setAsTop"
+    }
     var currentInsertions: Int = 0
     var currentPartitionings: Int = 0
     var livingDescendants: Int = 0
@@ -170,11 +182,19 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
     }
 
     def startRebalancing(): Unit = {
+        if (hierarchyMode != "binary") {
+            //is always balanced
+            return
+        }
         currentlyRebalancing = true
         tablePartitionActor ! PoisonPill
     }
 
     def rebalance(): Unit = {
+        if (hierarchyMode != "binary") {
+            //is always balanced
+            return
+        }
         // build balanced tree off of partitionCollection
         val dataType = schema.primaryKeyColumn.dataType
         def order = new Ordering[Any] {
@@ -199,7 +219,7 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
         log.info(s"Rebalancing tree map: $treeMap")
         // build new topPartitionActor who gets entire tree and builds children recursively
         tablePartitionActor = context.actorOf(
-            TablePartitionActor.props(tableName, tableName, schema, self, None, None, treeMap))
+            TablePartitionActor.props(tableName, tableName, schema, self, self, None, None, treeMap))
         currentlyRebalancing = false
     }
 
