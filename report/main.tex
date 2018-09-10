@@ -1,0 +1,91 @@
+\documentclass[sigconf]{acmart}
+
+% remove copyright footer
+\setcopyright{none}
+\settopmatter{printacmref=false}
+\renewcommand\footnotetextcopyrightpermission[1]{}
+
+\fancyhf{}
+
+% encoding and language
+%\usepackage[english]{babel}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+
+\usepackage{booktabs}
+\usepackage{balance}
+\usepackage[caption=false]{subfig}
+\usepackage[toc,acronym,shortcuts]{glossaries}
+\usepackage{hyperref}
+
+\def\pprw{8.5in}
+\def\pprh{11in}
+\special{papersize=\pprw,\pprh}
+\setlength{\paperwidth}{\pprw}
+\setlength{\paperheight}{\pprh}
+\setlength{\pdfpagewidth}{\pprw}
+\setlength{\pdfpageheight}{\pprh}
+
+\newacronym{IoT}{IoT}{Internet of Things}
+
+% shortcut for consistent naming of specific names
+\usepackage{xspace}
+\newcommand{\akka}{Akka\xspace}
+
+% autoref with capital letter (from https://tex.stackexchange.com/a/40413)
+\usepackage{catoptions}
+\makeatletter
+\def\figureautorefname{figure}
+\def\tableautorefname{table}
+\def\Autoref#1{%
+  \begingroup
+  \edef\reserved@a{\cpttrimspaces{#1}}%
+  \ifcsndefTF{r@#1}{%
+    \xaftercsname{\expandafter\testreftype\@fourthoffive}
+      {r@\reserved@a}.\\{#1}%
+  }{%
+    \ref{#1}%
+  }%
+  \endgroup
+}
+\def\testreftype#1.#2\\#3{%
+  \ifcsndefTF{#1autorefname}{%
+    \def\reserved@a##1##2\@nil{%
+      \uppercase{\def\ref@name{##1}}%
+      \csn@edef{#1autorefname}{\ref@name##2}%
+      \autoref{#3}%
+    }%
+    \reserved@a#1\@nil
+  }{%
+    \autoref{#3}%
+  }%
+}
+\makeatother
+
+\begin{document}
+
+\title{TODO: nice title}
+\subtitle{Actor Database Systems}
+
+\author{Jan Ehmueller and Fabian Sommer \\ \today}
+
+\begin{abstract}
+\begin{enumerate}
+	\item TODO
+\end{enumerate}
+\end{abstract}
+
+\maketitle
+
+\glsresetall
+
+\input{sections/01_introduction.tex}
+\input{sections/02_related_work.tex}
+
+% visually balance both columns
+\balance
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{bibliography}
+
+\end{document}
