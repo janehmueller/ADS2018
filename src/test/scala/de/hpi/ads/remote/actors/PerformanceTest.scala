@@ -14,7 +14,7 @@ import de.hpi.ads.remote.messages._
 //import org.apache.commons.io.FileUtils
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FlatSpecLike, Matchers}
 
-class PerformanceTest extends TestKit(ActorSystem("TableActorTest")) with ImplicitSender
+class PerformanceTest extends TestKit(ActorSystem("PerformanceTest")) with ImplicitSender
     with FlatSpecLike with Matchers with BeforeAndAfterAll with BeforeAndAfterEach
 {
     var counter: Int = 0

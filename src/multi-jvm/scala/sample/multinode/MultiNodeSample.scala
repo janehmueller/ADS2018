@@ -14,8 +14,8 @@ import akka.remote.testkit.MultiNodeSpec
 import akka.testkit.ImplicitSender
 import akka.actor.{ Props, Actor }
 
-class MultiNodeSampleSpecMultiJvmNode1 extends MultiNodeSample
-class MultiNodeSampleSpecMultiJvmNode2 extends MultiNodeSample
+class MultiNodeSampleMultiJvmNode1 extends MultiNodeSample
+class MultiNodeSampleMultiJvmNode2 extends MultiNodeSample
 
 object MultiNodeSample {
   class Ponger extends Actor {
