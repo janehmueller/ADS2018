@@ -1,8 +1,7 @@
 package sample.multinode
 
-import org.scalatest.{ BeforeAndAfterAll, WordSpecLike }
-import org.scalatest.Matchers
 import akka.remote.testkit.MultiNodeSpecCallbacks
+import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 
 /**
  * Hooks up MultiNodeSpec with ScalaTest
