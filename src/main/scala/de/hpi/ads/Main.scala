@@ -33,10 +33,10 @@ object Main {
         actorSystem.terminate()
     }
 
-    def startActorSystem(): ActorRef = {
+    def startActorSystem(): (ActorSystem, ActorRef) = {
         val actorSystem = ActorSystem("ActorDatabaseSystem")
         val interfaceActor = actorSystem.actorOf(InterfaceActor.props, InterfaceActor.defaultName)
         val userActor = actorSystem.actorOf(UserActor.props(interfaceActor), UserActor.defaultName)
-        userActor
+        (actorSystem, userActor)
     }
 }

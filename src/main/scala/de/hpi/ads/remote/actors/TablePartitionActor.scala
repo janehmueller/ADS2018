@@ -329,7 +329,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     }
 
     def insertRowWithNames(queryID: Int, data: List[(String, Any)], receiver: ActorRef): Unit = {
-        assert(hierarchyMode != "Bp")
+        assert(hierarchyMode != "Bp", "B+ tree hierarchy not yet fully supported!")
         if (!inputContainsValidKey(data)) {
             receiver ! TableOpFailureMessage(tableName, "INSERT", "Input does not contain valid primary key.")
             tableActor ! InsertionDoneMessage(queryID)
