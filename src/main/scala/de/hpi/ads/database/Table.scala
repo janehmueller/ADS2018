@@ -131,7 +131,7 @@ class Table(fileName: String, schema: TableSchema) {
     }
 
     def rebuildTableFromData(data: Array[Byte]): Unit = {
-        assert(tableFile.length() == 0)
+        assert(tableFile.length() == 0, s"Table file is not empty but has length ${tableFile.length()}")
         tableFile.write(data)
         rebuildIndex()
     }
