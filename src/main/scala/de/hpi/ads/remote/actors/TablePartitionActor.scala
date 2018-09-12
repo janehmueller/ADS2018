@@ -64,7 +64,7 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     val cluster = Cluster(context.system)
     val children : ListBuffer[ActorRef] = ListBuffer()
     var currentlySplitting : Boolean = false
-    val maxSize: Int = 10
+    val maxSize: Int = 1000
     var partitionPoint: Any = None
     val partitionPoints: ListBuffer[Any] = ListBuffer()
     val members: Seq[Member] = cluster.state.members.filter(_.status == MemberStatus.Up).toSeq

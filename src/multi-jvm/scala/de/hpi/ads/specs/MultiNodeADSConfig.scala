@@ -7,8 +7,8 @@ import com.typesafe.config.ConfigFactory
 object MultiNodeADSConfig extends MultiNodeConfig {
     val node1: RoleName = role("thor01")
     val node2: RoleName = role("thor02")
-//    val node3: RoleName = role("thor03")
-//    val node4: RoleName = role("thor04")
+    val node3: RoleName = role("thor03")
+    val node4: RoleName = role("thor04")
 
     private val adsConfigString = """
           |akka.cluster.auto-join = off
