@@ -91,7 +91,7 @@ class MultiNodeRandBpTest extends MultiNodeSpec(MultiNodeADSBpConfig) with STMul
             val row = List(1, "Great Movie")
             val tableActor = system.actorOf(TableActor.props(tableName, schema))
             Thread.sleep(1000)
-            val rang = 1 to 20000 toArray
+            val rang = 1 to 20000 toBuffer
             val randRang = RNG.shuffle(rang)
             val t0 = System.nanoTime()
             val msgCount = 20000

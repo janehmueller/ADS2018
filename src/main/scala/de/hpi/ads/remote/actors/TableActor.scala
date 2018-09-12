@@ -89,8 +89,8 @@ class TableActor(tableName: String, schema: TableSchema) extends ADSActor {
 
         /** Table Read */
         case msg: TableSelectWhereMessage =>
-            val queryCollector = this.queryResultCollector(msg.queryID, msg.receiver)
-            msg.receiver = queryCollector
+            //val queryCollector = this.queryResultCollector(msg.queryID, msg.receiver)
+            //msg.receiver = queryCollector
             tablePartitionActor ! msg
 
         /** Table Update */

@@ -362,6 +362,23 @@ class TablePartitionActor(tableName: String, fileName: String, schema: TableSche
     def selectWhere(queryID: Int, projection: List[String], operator: Operator, receiver: ActorRef): Unit = {
         // gather answers either from child actors or from associated data
         if (children.nonEmpty) {
+            if (this.hierarchyMode == "Bp") {
+                for (i <- 0 until partitionPoints.length) {
+                    if (schema.primaryKeyColumn.dataType.lessThan(operator.value, partitionPoints(i))) {
+                        children(i) ! TableSelectWhereMessage(queryID, projection, operator, receiver)
+                        return
+                    }
+                }
+                children.last ! TableSelectWhereMessage(queryID, projection, operator, receiver)
+                return
+            } else {
+                if (schema.primaryKeyColumn.dataType.lessThan(operator.value, partitionPoint)) {
+                    children(0) ! TableSelectWhereMessage(queryID, projection, operator, receiver)
+                } else {
+                    children(1) ! TableSelectWhereMessage(queryID, projection, operator, receiver)
+                }
+                return
+            }
             receiver ! ExpectResultsMessage(queryID, children.length - 1)
             children.foreach(_ ! TableSelectWhereMessage(queryID, projection, operator, receiver))
             return

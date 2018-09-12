@@ -91,8 +91,8 @@ class MultiNodeRandBinTest extends MultiNodeSpec(MultiNodeADSBinaryConfig) with 
             val row = List(1, "Great Movie")
             val tableActor = system.actorOf(TableActor.props(tableName, schema))
             Thread.sleep(1000)
-            val rang = 1 to 20000 toArray
-            val randRang = RNG.shuffle(rang)
+            val rang = 1 to 20000 toBuffer
+            val randRang = util.Random.shuffle(rang)
             val t0 = System.nanoTime()
             val msgCount = 20000
             for (i <- 1 to msgCount) {
